@@ -1,4 +1,5 @@
 import json
+import platform
 from pathlib import Path
 from typing import Optional
 from src.cliplocal.config.settings import config
@@ -9,7 +10,13 @@ from src.cliplocal.transcribe.faster_engine import FasterWhisperTranscriber
 from src.cliplocal.transcribe.cpp_engine import WhisperCppTranscriber
 
 def get_transcriber(backend: Optional[str] = None):
-    chosen = backend or config.get("transcribe", {}).get("backend", "mlx")
+    default_backend = "mlx" if platform.system() == "Darwin" else "faster_whisper"
+    chosen = backend or config.get("transcribe", {}).get("backend", default_backend)
+
+    # MLX is exclusive to Apple Silicon macOS; fallback to faster_whisper on Windows/Linux
+    if chosen == "mlx" and platform.system() != "Darwin":
+        chosen = "faster_whisper"
+
     if chosen == "mlx":
         model_name = config.get("transcribe", {}).get("model", "mlx-community/whisper-large-v3-turbo")
         return MLXWhisperTranscriber(model_name=model_name)

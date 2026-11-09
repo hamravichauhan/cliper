@@ -5,15 +5,42 @@ from pathlib import Path
 from typing import Tuple, List, Optional
 import shutil
 
+import platform
+
 def get_system_ram_gb() -> float:
-    """Detect available physical RAM in GB (macOS sysctl or os fallback)."""
+    """Detect available physical RAM in GB across macOS, Windows, and Linux."""
     try:
-        out = subprocess.check_output(["sysctl", "-n", "hw.memsize"]).strip()
-        bytes_val = int(out)
-        return round(bytes_val / (1024 ** 3), 2)
+        if platform.system() == "Darwin":
+            out = subprocess.check_output(["sysctl", "-n", "hw.memsize"]).strip()
+            return round(int(out) / (1024 ** 3), 2)
+        elif platform.system() == "Windows":
+            import ctypes
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+            stat = MEMORYSTATUSEX()
+            stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+            return round(stat.ullTotalPhys / (1024 ** 3), 2)
+        else:
+            # Linux fallback
+            with open("/proc/meminfo", "r") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        kb = int(line.split()[1])
+                        return round(kb / (1024 ** 2), 2)
     except Exception:
-        # Fallback
-        return 16.0
+        pass
+    return 16.0
 
 def compute_file_hash(file_path: Path | str, chunk_size: int = 1024 * 1024) -> str:
     """Compute SHA-256 hash of a file or URL string."""
@@ -60,7 +87,7 @@ def ass_time(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 def check_hardware_encoder() -> str:
-    """Probe whether h264_videotoolbox is supported by ffmpeg."""
+    """Probe whether hardware encoders (Apple VideoToolbox, NVIDIA NVENC, AMD AMF, Intel QSV) are supported."""
     try:
         result = subprocess.run(
             ["ffmpeg", "-encoders"],
@@ -69,8 +96,15 @@ def check_hardware_encoder() -> str:
             text=True,
             check=True
         )
-        if "h264_videotoolbox" in result.stdout:
+        stdout = result.stdout
+        if "h264_videotoolbox" in stdout and platform.system() == "Darwin":
             return "h264_videotoolbox"
+        elif "h264_nvenc" in stdout:
+            return "h264_nvenc"
+        elif "h264_amf" in stdout:
+            return "h264_amf"
+        elif "h264_qsv" in stdout:
+            return "h264_qsv"
     except Exception:
         pass
     return "libx264"

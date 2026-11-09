@@ -47,16 +47,15 @@ ClipLocal is a **100% free, fully offline, single-user** video-to-shorts tool de
 
 ## System Requirements
 
-- **Operating System**: macOS (Apple Silicon M1/M2/M3/M4)
-- **Memory**: 16 GB Unified Memory (or higher)
-- **Prerequisites**: [Homebrew](https://brew.sh) and Python 3.11+
+- **macOS**: Apple Silicon M1 / M2 / M3 / M4 (16 GB Unified Memory recommended).
+- **Windows**: Windows 10 or 11 (64-bit), 16 GB RAM recommended. NVIDIA GeForce / RTX GPU (NVENC acceleration) supported, with automatic CPU fallback.
 
 ---
 
-## Quick Start
+## Quick Start (macOS)
 
 ### 1. Run Setup
-The single setup script verifies Homebrew, installs `uv`, links `ffmpeg-full` with `libass` and `h264_videotoolbox`, configures the Python virtual environment, and builds the frontend:
+The setup script verifies Homebrew, installs `uv`, links `ffmpeg-full` with `libass` and `h264_videotoolbox`, configures the Python virtual environment, and builds the frontend:
 
 ```bash
 ./setup.sh
@@ -68,6 +67,42 @@ Start the local server and open the studio in your browser (`http://127.0.0.1:80
 ```bash
 ./run.sh
 ```
+
+---
+
+## Quick Start (Windows)
+
+ClipLocal runs natively on Windows 10 & 11!
+
+### 1. Prerequisites (One-Time)
+Open **PowerShell** as Administrator or standard terminal and install `uv` and `ffmpeg` (Gyan.dev build with `libass`):
+
+```powershell
+# Install uv package manager
+winget install --id=astral-sh.uv -e
+
+# Install full FFmpeg (with libass subtitle and NVENC support)
+winget install --id=Gyan.FFmpeg -e
+```
+*(Or install manually from https://docs.astral.sh/uv/ and https://www.gyan.dev/ffmpeg/builds/)*.
+
+### 2. Run Setup
+In the project directory, run the Windows setup script:
+
+```cmd
+setup.bat
+```
+*(This syncs Python 3.11 packages via `uv`, compiles the React Web UI, and generates the test fixture).*
+
+### 3. Launch the Studio
+Double-click `run.bat` or run:
+
+```cmd
+run.bat
+```
+This automatically launches the FastAPI studio and opens your default browser at `http://127.0.0.1:8000`.
+
+> **Windows Tip**: On Windows, the transcription backend automatically defaults to `faster_whisper` (CPU int8 or NVIDIA CUDA), and video encoding uses NVIDIA NVENC (`h264_nvenc`) if present, or CPU `libx264`.
 
 ---
 
@@ -130,7 +165,7 @@ Run the automated test suite covering sentence segmentation, candidate generatio
 uv run pytest tests/
 ```
 
-All 20 unit tests execute in under 1 second.
+All 28 unit tests execute in under 1 second.
 
 ---
 
