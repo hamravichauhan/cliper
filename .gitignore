@@ -1,0 +1,11 @@
+.venv/
+.cache/
+output/
+__pycache__/
+*.pyc
+*.egg-info/
+.DS_Store
+*.swp
+fixtures/tmp_*
+node_modules/
+dist/

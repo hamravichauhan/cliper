@@ -1,0 +1,153 @@
+# ClipLocal Configuration File
+
+app:
+  name: "ClipLocal"
+  cache_dir: ".cache"
+  output_dir: "output"
+  max_memory_gb: 16
+
+system:
+  encoder: "h264_videotoolbox"
+  fallback_encoder: "libx264"
+  whisper_cpp_bin: "/opt/homebrew/bin/whisper-cli"
+  ffmpeg_bin: "/opt/homebrew/bin/ffmpeg"
+  ffprobe_bin: "/opt/homebrew/bin/ffprobe"
+
+transcribe:
+  backend: "mlx"  # mlx | whisper_cpp | faster_whisper
+  model: "mlx-community/whisper-large-v3-turbo"
+  fallback_model: "mlx-community/whisper-small-mlx"
+  faster_whisper_model: "large-v3-turbo"
+  language: "auto"
+  word_timestamps: true
+  vad_filter: true
+  vad_min_silence_duration_ms: 800
+
+segmentation:
+  pause_threshold: 0.85
+  min_words_per_sentence: 3
+  topic_model: "all-MiniLM-L6-v2"
+  topic_shift_threshold: 0.45
+  dangling_words:
+    - "a"
+    - "an"
+    - "the"
+    - "and"
+    - "but"
+    - "or"
+    - "so"
+    - "because"
+    - "like"
+    - "if"
+    - "that"
+    - "which"
+    - "with"
+    - "to"
+    - "when"
+    - "as"
+    - "then"
+    - "than"
+    - "of"
+    - "in"
+    - "on"
+    - "at"
+    - "by"
+    - "for"
+    - "about"
+    - "is"
+    - "are"
+    - "was"
+    - "were"
+    - "my"
+    - "your"
+    - "into"
+    - "from"
+
+candidates:
+  min_duration_s: 20.0
+  max_duration_s: 60.0
+  target_duration_s: 42.0
+  max_candidates: 25
+  dedupe_overlap_threshold: 0.30
+  default_top_n: 6
+
+scoring:
+  weights:
+    hook: 30.0
+    acoustic: 20.0
+    pace: 15.0
+    payoff: 15.0
+    sentiment: 10.0
+    length_fit: 10.0
+  pace_wpm_optimal: [120, 175]
+  pace_wpm_acceptable: [95, 210]
+  banter_penalty: -25.0
+  broken_start_penalty: -20.0
+
+captions:
+  default_style: "hormozi"
+  max_words_per_group: 4
+  max_lines: 2
+  safe_area_margin_v: 240
+  safe_area_margin_h: 60
+  styles:
+    hormozi:
+      font_name: "Arial"
+      font_size: 48
+      bold: true
+      uppercase: true
+      primary_color: "#FFFFFF"
+      highlight_color: "#FFEA00"  # Vibrant Yellow
+      outline_color: "#000000"
+      outline_width: 4
+      shadow_offset: 2
+      highlight_scale: 110
+    minimal:
+      font_name: "Arial"
+      font_size: 40
+      bold: false
+      uppercase: false
+      primary_color: "#FFFFFF"
+      highlight_color: "#64B5F6"  # Soft Blue
+      outline_color: "#1E1E1E"
+      outline_width: 2
+      shadow_offset: 1
+      highlight_scale: 104
+    boxed:
+      font_name: "Arial"
+      font_size: 44
+      bold: true
+      uppercase: true
+      primary_color: "#FFFFFF"
+      highlight_color: "#000000"
+      highlight_box_color: "#FFCC00" # Pill background
+      outline_color: "#000000"
+      outline_width: 3
+      shadow_offset: 0
+      highlight_scale: 105
+    neon:
+      font_name: "Arial"
+      font_size: 46
+      bold: true
+      uppercase: true
+      primary_color: "#FFFFFF"
+      highlight_color: "#00F0FF"  # Neon Cyan
+      outline_color: "#FF007F"  # Neon Magenta
+      outline_width: 4
+      shadow_offset: 3
+      highlight_scale: 112
+
+rendering:
+  output_width: 1080
+  output_height: 1920
+  fps: 30
+  video_bitrate: "6000k"
+  audio_bitrate: "192k"
+  audio_sample_rate: 48000
+  loudnorm_target: -14.0
+
+ollama:
+  enabled: false
+  host: "http://127.0.0.1:11434"
+  model: "llama3.2:3b"
+  timeout_seconds: 45
