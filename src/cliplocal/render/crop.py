@@ -19,11 +19,24 @@ def build_crop_filter(
             f"[fg]scale={out_w}:-1[fg_scaled];"
             f"[bg_blur][fg_scaled]overlay=(W-w)/2:(H-h)/2[v_reframed]"
         )
-    elif mode == ReframeMode.FACE_FOLLOW:
-        # Dynamic or centered face crop
-        # Target crop width for 9:16 from input height
+    elif mode == ReframeMode.SPLIT_STACKED:
+        # Mode E: Split stacked 2-speaker vertical layout (two 1080x960 panels stacked)
         crop_w = int(in_h * 9 / 16)
-        # Ensure crop width is even
+        if crop_w % 2 != 0:
+            crop_w -= 1
+        crop_h = in_h
+        panel_h = out_h // 2
+        x_left = max(0, min(in_w - crop_w, int(in_w * 0.25 - crop_w // 2)))
+        x_right = max(0, min(in_w - crop_w, int(in_w * 0.75 - crop_w // 2)))
+        return (
+            f"[0:v]split=2[v_left][v_right];"
+            f"[v_left]crop={crop_w}:{crop_h}:{x_left}:0,scale={out_w}:{panel_h}[top_panel];"
+            f"[v_right]crop={crop_w}:{crop_h}:{x_right}:0,scale={out_w}:{panel_h}[bottom_panel];"
+            f"[top_panel][bottom_panel]vstack[v_reframed]"
+        )
+    elif mode in (ReframeMode.FACE_FOLLOW, ReframeMode.ACTIVE_SPEAKER):
+        # Dynamic or centered face/speaker crop
+        crop_w = int(in_h * 9 / 16)
         if crop_w % 2 != 0:
             crop_w -= 1
         crop_h = in_h
