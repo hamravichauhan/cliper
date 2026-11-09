@@ -13,6 +13,10 @@ export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpd
   const [end, setEnd] = useState<number>(clip.end)
   const [captionStyle, setCaptionStyle] = useState<string>(clip.caption_style || 'hormozi')
   const [reframeMode, setReframeMode] = useState<string>(clip.reframe_mode || 'center')
+  const [autoZoom, setAutoZoom] = useState<boolean>(clip.auto_zoom ?? true)
+  const [includeEmojis, setIncludeEmojis] = useState<boolean>(clip.include_emojis ?? true)
+  const [includeSfx, setIncludeSfx] = useState<boolean>(clip.include_sfx ?? true)
+  const [bgMusic, setBgMusic] = useState<boolean>(clip.background_music ?? false)
   const [deletedIndices, setDeletedIndices] = useState<Set<number>>(new Set())
   const [isReRendering, setIsReRendering] = useState<boolean>(false)
   const [videoSrc, setVideoSrc] = useState<string>(
@@ -44,7 +48,11 @@ export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpd
           end: Number(end),
           deleted_words: Array.from(deletedIndices),
           caption_style: captionStyle,
-          reframe_mode: reframeMode
+          reframe_mode: reframeMode,
+          auto_zoom: autoZoom,
+          include_emojis: includeEmojis,
+          include_sfx: includeSfx,
+          background_music: bgMusic
         })
       })
 
@@ -199,6 +207,66 @@ export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpd
                 <option value="blur_fill">🌫️ Blur-Fill</option>
                 <option value="face_follow">👤 Face-Follow</option>
               </select>
+            </div>
+          </div>
+
+          {/* Viral Enhancements Toggles */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+            <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">
+              Active Enhancements
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setAutoZoom(!autoZoom)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                  autoZoom
+                    ? 'bg-violet-500/15 border-violet-500 text-violet-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                }`}
+              >
+                <span>⚡ Auto-Zoom</span>
+                <span className="text-[10px]">{autoZoom ? 'ON' : 'OFF'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIncludeEmojis(!includeEmojis)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                  includeEmojis
+                    ? 'bg-fuchsia-500/15 border-fuchsia-500 text-fuchsia-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                }`}
+              >
+                <span>✨ Emojis</span>
+                <span className="text-[10px]">{includeEmojis ? 'ON' : 'OFF'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIncludeSfx(!includeSfx)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                  includeSfx
+                    ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                }`}
+              >
+                <span>🔊 Pop SFX</span>
+                <span className="text-[10px]">{includeSfx ? 'ON' : 'OFF'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBgMusic(!bgMusic)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                  bgMusic
+                    ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                }`}
+              >
+                <span>🎵 Music</span>
+                <span className="text-[10px]">{bgMusic ? 'ON' : 'OFF'}</span>
+              </button>
             </div>
           </div>
 

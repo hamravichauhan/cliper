@@ -41,6 +41,10 @@ class SubmitJobRequest(BaseModel):
     backend: str = "mlx"
     language: Optional[str] = None
     use_llm: bool = False
+    auto_zoom: bool = True
+    include_emojis: bool = True
+    include_sfx: bool = True
+    background_music: bool = False
 
 @app.post("/api/jobs")
 async def create_job(req: SubmitJobRequest):
@@ -82,6 +86,10 @@ class ReRenderRequest(BaseModel):
     deleted_words: List[int] = [] # Autocut-style: indices of words to remove
     caption_style: str = "hormozi"
     reframe_mode: str = "center"
+    auto_zoom: bool = True
+    include_emojis: bool = True
+    include_sfx: bool = True
+    background_music: bool = False
 
 @app.post("/api/clips/re-render")
 async def re_render_clip(req: ReRenderRequest):
@@ -111,7 +119,11 @@ async def re_render_clip(req: ReRenderRequest):
         candidate=candidate,
         output_dir=output_dir,
         metadata=job.metadata,
-        reframe_mode=candidate.reframe_mode
+        reframe_mode=candidate.reframe_mode,
+        auto_zoom=req.auto_zoom,
+        include_emojis=req.include_emojis,
+        include_sfx=req.include_sfx,
+        background_music=req.background_music
     )
 
     return {"output_path": str(out_file), "candidate": candidate.model_dump()}

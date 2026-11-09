@@ -9,7 +9,8 @@ def run_ffmpeg_render(
     duration: float,
     filter_complex: str,
     output_mp4: Path | str,
-    audio_loudnorm: bool = True
+    audio_loudnorm: bool = True,
+    extra_inputs: list = None
 ) -> Path:
     """
     Execute FFmpeg transcode pipeline to generate vertical short clip.
@@ -30,7 +31,20 @@ def run_ffmpeg_render(
             "-ss", f"{start_sec:.3f}",
             "-t", f"{duration:.3f}",
             "-i", str(in_p),
-            "-filter_complex", f"{filter_complex};[0:a]{audio_filter}[a_out]",
+        ]
+        # Add extra inputs (e.g. music, SFX)
+        if extra_inputs:
+            for extra in extra_inputs:
+                cmd.extend(["-i", str(extra)])
+
+        # Determine filter complex
+        if "[a_out]" in filter_complex:
+            full_filter = filter_complex
+        else:
+            full_filter = f"{filter_complex};[0:a]{audio_filter}[a_out]"
+
+        cmd.extend([
+            "-filter_complex", full_filter,
             "-map", "[v_out]",
             "-map", "[a_out]",
             "-c:v", selected_encoder,
@@ -40,7 +54,7 @@ def run_ffmpeg_render(
             "-ar", "48000",
             "-movflags", "+faststart",
             str(out_p)
-        ]
+        ])
         return cmd
 
     try:

@@ -17,6 +17,10 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
   const [reframeMode, setReframeMode] = useState('auto')
   const [backend, setBackend] = useState('mlx')
   const [useLLM, setUseLLM] = useState(false)
+  const [autoZoom, setAutoZoom] = useState(true)
+  const [includeEmojis, setIncludeEmojis] = useState(true)
+  const [includeSfx, setIncludeSfx] = useState(true)
+  const [bgMusic, setBgMusic] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
 
@@ -45,7 +49,11 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
           min_duration: minDuration,
           max_duration: maxDuration,
           backend,
-          use_llm: useLLM
+          use_llm: useLLM,
+          auto_zoom: autoZoom,
+          include_emojis: includeEmojis,
+          include_sfx: includeSfx,
+          background_music: bgMusic
         })
       })
       const jobData = await jobRes.json()
@@ -224,6 +232,66 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
                   useLLM ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
+            </button>
+          </div>
+        </div>
+
+        {/* Viral Enhancements Chips */}
+        <div className="border-t border-slate-800/80 pt-4">
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            Viral Enhancements (Auto-Zoom, Emojis, Audio)
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <button
+              type="button"
+              onClick={() => setAutoZoom(!autoZoom)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                autoZoom
+                  ? 'bg-violet-500/15 border-violet-500 text-violet-300 shadow-sm'
+                  : 'bg-slate-950 border-slate-800 text-slate-500'
+              }`}
+            >
+              <span>⚡ Auto-Zoom</span>
+              <span className="text-[10px]">{autoZoom ? 'ON' : 'OFF'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIncludeEmojis(!includeEmojis)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                includeEmojis
+                  ? 'bg-fuchsia-500/15 border-fuchsia-500 text-fuchsia-300 shadow-sm'
+                  : 'bg-slate-950 border-slate-800 text-slate-500'
+              }`}
+            >
+              <span>✨ Smart Emojis</span>
+              <span className="text-[10px]">{includeEmojis ? 'ON' : 'OFF'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIncludeSfx(!includeSfx)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                includeSfx
+                  ? 'bg-cyan-500/15 border-cyan-500 text-cyan-300 shadow-sm'
+                  : 'bg-slate-950 border-slate-800 text-slate-500'
+              }`}
+            >
+              <span>🔊 Pop SFX</span>
+              <span className="text-[10px]">{includeSfx ? 'ON' : 'OFF'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setBgMusic(!bgMusic)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                bgMusic
+                  ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300 shadow-sm'
+                  : 'bg-slate-950 border-slate-800 text-slate-500'
+              }`}
+            >
+              <span>🎵 Lo-Fi Music</span>
+              <span className="text-[10px]">{bgMusic ? 'ON' : 'OFF'}</span>
             </button>
           </div>
         </div>

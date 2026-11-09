@@ -222,7 +222,11 @@ class JobManager:
                 candidate=cand,
                 output_dir=output_dir,
                 metadata=metadata,
-                reframe_mode=reframe_mode
+                reframe_mode=reframe_mode,
+                auto_zoom=bool(options.get("auto_zoom", True)),
+                include_emojis=bool(options.get("include_emojis", True)),
+                include_sfx=bool(options.get("include_sfx", True)),
+                background_music=bool(options.get("background_music", False))
             )
             rendered_list.append(cand)
             step_progress = 70.0 + ((i + 1) / len(top_candidates)) * 28.0

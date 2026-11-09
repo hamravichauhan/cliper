@@ -3,6 +3,7 @@ from typing import List, Optional
 from src.cliplocal.core.models import Word, CaptionStyleName
 from src.cliplocal.core.utils import ass_time
 from src.cliplocal.captions.styles import get_caption_style, CaptionStyleConfig
+from src.cliplocal.captions.emojis import get_emoji_for_word
 
 def hex_to_ass_color(hex_str: str, alpha: str = "00") -> str:
     """Convert #RRGGBB to ASS &HAABBGGRR (Blue-Green-Red order)."""
@@ -38,7 +39,8 @@ def generate_ass_subtitles(
     output_ass_path: Path | str,
     time_offset: float = 0.0,
     style_name: CaptionStyleName | str = CaptionStyleName.HORMOZI,
-    max_words_per_group: int = 3
+    max_words_per_group: int = 3,
+    include_emojis: bool = True
 ) -> Path:
     """
     Generate an ASS subtitle file with animated word-level karaoke pop highlights.
@@ -94,6 +96,11 @@ def generate_ass_subtitles(
                 text_clean = escape_ass(w.word)
                 if style.uppercase:
                     text_clean = text_clean.upper()
+
+                if include_emojis:
+                    emoji = get_emoji_for_word(w.word)
+                    if emoji:
+                        text_clean = f"{text_clean} {emoji}"
 
                 if j == idx:
                     # Popping animation tag on active word

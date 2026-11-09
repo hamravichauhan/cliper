@@ -29,7 +29,11 @@ def run(
     style: str = typer.Option("hormozi", "--style", "-s", help="Caption style: hormozi | minimal | boxed | neon"),
     mode: str = typer.Option("center", "--mode", "-m", help="Reframe mode: center | blur_fill | face_follow | auto"),
     backend: Optional[str] = typer.Option(None, "--backend", "-b", help="Transcription backend: mlx | faster_whisper | whisper_cpp"),
-    no_llm: bool = typer.Option(True, "--no-llm", help="Disable Ollama LLM re-ranking (pure heuristics)")
+    no_llm: bool = typer.Option(True, "--no-llm", help="Disable Ollama LLM re-ranking (pure heuristics)"),
+    auto_zoom: bool = typer.Option(True, "--auto-zoom/--no-auto-zoom", help="Enable dynamic 1.15x punch-in zooms"),
+    emojis: bool = typer.Option(True, "--emojis/--no-emojis", help="Add contextual animated emojis to captions"),
+    sfx: bool = typer.Option(True, "--sfx/--no-sfx", help="Add subtle pop & chime sound effects on hook keywords"),
+    music: bool = typer.Option(False, "--music/--no-music", help="Add ambient lo-fi background music with auto-ducking")
 ):
     """Transform horizontal video into ranked, captioned, vertical 9:16 short clips."""
     console.print(Panel.fit("[bold green]🎬 ClipLocal Pipeline[/] — Free, Offline Short Clip Generator", style="cyan"))
@@ -107,7 +111,11 @@ def run(
                 candidate=cand,
                 output_dir=output_dir,
                 metadata=metadata,
-                reframe_mode=reframe_mode
+                reframe_mode=reframe_mode,
+                auto_zoom=auto_zoom,
+                include_emojis=emojis,
+                include_sfx=sfx,
+                background_music=music
             )
             console.print(f"  [green]✔ Rendered:[/] {out_file.name}")
     timer.end_stage()
