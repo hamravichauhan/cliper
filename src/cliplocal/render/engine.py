@@ -6,7 +6,16 @@ from src.cliplocal.core.models import CandidateClip, ReframeMode, VideoMetadata
 from src.cliplocal.captions.ass_generator import generate_ass_subtitles
 from src.cliplocal.render.crop import build_crop_filter
 from src.cliplocal.render.ffmpeg import run_ffmpeg_render
+from src.cliplocal.reframe.face_tracker import FaceTracker
 from src.cliplocal.config.settings import config
+
+_face_tracker: Optional[FaceTracker] = None
+
+def get_face_tracker() -> FaceTracker:
+    global _face_tracker
+    if _face_tracker is None:
+        _face_tracker = FaceTracker()
+    return _face_tracker
 
 def slugify(text: str) -> str:
     """Create a safe URL/filename slug from title or text."""
@@ -43,15 +52,31 @@ def render_candidate_clip(
         style_name=candidate.caption_style
     )
 
-    # 2. Build Filter Complex
+    # 2. Reframe Analysis & Filter Construction
     in_w = metadata.width if metadata else 1920
     in_h = metadata.height if metadata else 1080
+    effective_mode = reframe_mode
+    center_x = 0.5
+
+    if reframe_mode in (ReframeMode.AUTO, ReframeMode.FACE_FOLLOW):
+        try:
+            tracker = get_face_tracker()
+            track_result = tracker.track_clip(vp, candidate.start, candidate.end)
+            center_x = track_result.get("dominant_center_x", 0.5)
+            if reframe_mode == ReframeMode.AUTO:
+                effective_mode = track_result.get("recommended_mode", ReframeMode.FACE_FOLLOW)
+            else:
+                effective_mode = ReframeMode.FACE_FOLLOW
+        except Exception:
+            effective_mode = ReframeMode.CENTER
+
     crop_filter = build_crop_filter(
-        mode=reframe_mode,
+        mode=effective_mode,
         in_w=in_w,
         in_h=in_h,
         out_w=1080,
-        out_h=1920
+        out_h=1920,
+        center_x_ratio=center_x
     )
 
     # Path for FFmpeg libass filter
