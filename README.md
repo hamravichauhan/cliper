@@ -27,7 +27,13 @@ ClipLocal is a **100% free, fully offline, single-user** video-to-shorts tool de
   - **Auto Mode**: Automatically selects the best mode based on detected faces.
 - **Animated Karaoke ASS Captions**:
   - High-retention word-by-word popping highlights (Hormozi style, Minimalist, Boxed pill, and Neon glow).
+  - **Contextual Animated Emojis**: Automatic emoji injection above viral trigger words (e.g. 💰, 🔥, 🤫, 🛑, 🚀, 💡).
   - Safe-area margin compliance for TikTok, Reels, and Shorts.
+- **Dynamic Punch-Ins (Auto-Zoom)**:
+  - Automatic 1.15x close-up punch-ins on opening hook sentences and intermittent cadence resets every ~7 seconds.
+- **Viral SFX & Background Music with Auto-Ducking**:
+  - **Procedural 48kHz SFX**: Subtly mixes pops, whooshes, and dings on keywords and statistics.
+  - **Smart Lo-Fi Background Music**: Includes a warm 60s ambient chord track automatically ducked (-18 dB) when the speaker talks and smoothly swelling during pauses via FFmpeg `sidechaincompress`.
 - **Interactive Web Studio & CLI**:
   - **Screen 1**: Drop a video or paste a URL, configure parameters, and monitor live progress logs.
   - **Screen 2**: Browse ranked clips, inspect virality score breakdowns, and preview 9:16 video.
