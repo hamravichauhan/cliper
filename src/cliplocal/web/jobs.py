@@ -16,6 +16,7 @@ from src.cliplocal.segment.sentences import group_words_into_sentences
 from src.cliplocal.candidates.window_builder import build_candidate_windows
 from src.cliplocal.score.virality import score_all_candidates
 from src.cliplocal.candidates.dedupe import deduplicate_candidates
+from src.cliplocal.llm.rerank import rerank_candidates_with_llm
 from src.cliplocal.render.engine import render_candidate_clip
 
 class JobManager:
@@ -181,6 +182,14 @@ class JobManager:
         clip_count = int(options.get("clips", 6))
         top_candidates = await asyncio.to_thread(deduplicate_candidates, scored, top_n=clip_count)
         log(f"Deduplicated and selected top {len(top_candidates)} viral candidates")
+
+        # 4.5 Optional Local LLM Re-Ranking
+        if options.get("use_llm"):
+            job.stage = "4.5 Ollama Local LLM Re-Ranking & Titles"
+            log("Running local Ollama LLM to enhance titles and social hooks...")
+            top_candidates = await asyncio.to_thread(rerank_candidates_with_llm, top_candidates)
+            log("LLM re-ranking and caption generation complete")
+
         timing_report["Scoring & Ranking"] = round(time.perf_counter() - t0, 3)
         job.progress = 70.0
         self._persist_job(job, options)

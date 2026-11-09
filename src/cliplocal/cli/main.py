@@ -15,6 +15,7 @@ from src.cliplocal.segment.sentences import group_words_into_sentences
 from src.cliplocal.candidates.window_builder import build_candidate_windows
 from src.cliplocal.score.virality import score_all_candidates
 from src.cliplocal.candidates.dedupe import deduplicate_candidates
+from src.cliplocal.llm.rerank import rerank_candidates_with_llm
 from src.cliplocal.render.engine import render_candidate_clip
 from src.cliplocal.config.settings import config
 
@@ -80,9 +81,14 @@ def run(
     # Stage 6: Deduplication
     timer.start_stage("6. Deduplication & Ranking")
     top_candidates = deduplicate_candidates(scored, top_n=clips)
+
+    if not no_llm:
+        console.print("[cyan]Running local Ollama LLM re-ranking & title generation...[/]")
+        top_candidates = rerank_candidates_with_llm(top_candidates)
+
     console.print(f"[bold green]✔ Selected Top {len(top_candidates)} viral candidates:[/]")
     for c in top_candidates:
-        console.print(f"  [bold]#{c.index:02d}[/] [yellow]{c.start:.1f}s - {c.end:.1f}s ({c.duration:.1f}s)[/] | Score: [bold cyan]{c.score.total_score:.1f}[/] | Hook: [magenta]{c.score.hook_type}[/]")
+        console.print(f"  [bold]#{c.index:02d}[/] [yellow]{c.start:.1f}s - {c.end:.1f}s ({c.duration:.1f}s)[/] | Score: [bold cyan]{c.score.total_score:.1f}[/] | Title: [white]\"{c.title}\"[/] | Hook: [magenta]{c.score.hook_type}[/]")
     timer.end_stage()
 
     # Stage 7: Render Clips
