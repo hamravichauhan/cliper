@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useStore } from './store/useStore'
 import { Sidebar } from './components/layout/Sidebar'
 import { Header } from './components/layout/Header'
@@ -19,7 +19,13 @@ import { ScheduleScreen } from './screens/ScheduleScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 
 export const App: React.FC = () => {
-  const { currentScreen } = useStore()
+  const { currentScreen, fetchHealth } = useStore()
+
+  useEffect(() => {
+    fetchHealth()
+    const interval = setInterval(fetchHealth, 5000)
+    return () => clearInterval(interval)
+  }, [fetchHealth])
 
   const renderScreen = () => {
     switch (currentScreen) {

@@ -66,6 +66,7 @@ interface AppState {
   redoTrim: () => void
   approveAllClips: () => void
   bulkExportApproved: () => void
+  fetchHealth: () => Promise<void>
 
   // Toasts
   toasts: ToastMessage[]
@@ -222,6 +223,29 @@ export const useStore = create<AppState>((set, get) => ({
       description: `Packaging ${approved.length} approved clips (ProRes 422 / 9:16 MP4).`,
       type: 'success'
     })
+  },
+
+  fetchHealth: async () => {
+    try {
+      const res = await fetch('/api/health')
+      if (res.ok) {
+        const data = await res.json()
+        set((state) => ({
+          engineHealth: {
+            ...state.engineHealth,
+            metalAccelerated: Boolean(data.metal_accelerated),
+            metalDeviceName: data.metal_device_name || state.engineHealth.metalDeviceName,
+            whisperModel: data.whisper_model || state.engineHealth.whisperModel,
+            ollamaAvailable: Boolean(data.ollama_available),
+            circuitBreakerState: data.circuit_breaker_state || state.engineHealth.circuitBreakerState,
+            ramAvailableGb: data.ram_available_gb || state.engineHealth.ramAvailableGb,
+            activeWorkers: data.active_workers || state.engineHealth.activeWorkers
+          }
+        }))
+      }
+    } catch {
+      // Graceful offline mock fallback
+    }
   },
 
   toasts: [],
