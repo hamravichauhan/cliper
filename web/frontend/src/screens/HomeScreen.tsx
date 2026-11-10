@@ -20,11 +20,11 @@ export const HomeScreen: React.FC = () => {
   const activeProj = projects[0]
 
   const stats = [
-    { label: 'Clips Produced', val: '142', change: '+24 this week', icon: <Scissors className="w-4 h-4 text-accent" /> },
-    { label: 'Hours Saved', val: '38.5h', change: '8.4x faster vs Premiere', icon: <Clock className="w-4 h-4 text-text-muted" /> },
-    { label: 'Avg Virality Score', val: '86.4', change: 'Top 5% bracket', icon: <TrendingUp className="w-4 h-4 text-accent" /> },
-    { label: 'Minutes Ingested', val: '840m', change: '14 total episodes', icon: <Zap className="w-4 h-4 text-text-muted" /> },
-    { label: 'Storage Used', val: '14.2 GB', change: 'Cache: 4.8 GB', icon: <HardDrive className="w-4 h-4 text-text-muted" /> }
+    { label: 'Clips Produced', val: '16', change: '3 active harvests', icon: <Scissors className="w-4 h-4 text-accent" /> },
+    { label: 'Hours Saved', val: '5.5h', change: '8.4x faster vs manual edit', icon: <Clock className="w-4 h-4 text-text-muted" /> },
+    { label: 'Avg Virality Score', val: '78.4', change: 'Hook: 85.9 WPM: 168', icon: <TrendingUp className="w-4 h-4 text-accent" /> },
+    { label: 'Minutes Ingested', val: '183m', change: '3 full episodes', icon: <Zap className="w-4 h-4 text-text-muted" /> },
+    { label: 'Storage Used', val: '4.47 GB', change: 'ProRes & H.265 caches', icon: <HardDrive className="w-4 h-4 text-text-muted" /> }
   ]
 
   return (

@@ -65,18 +65,41 @@ export const ClipReviewStudio: React.FC = () => {
   // Find active clip
   const clip = clips.find((c) => c.id === selectedClipId) || clips[0]
 
+  // Video element reference for real playback
+  const videoRef = useRef<HTMLVideoElement>(null)
+
   // Local inspector tab
   const [inspectorTab, setInspectorTab] = useState<'details' | 'captions' | 'copy' | 'brand'>('details')
   const [filterStatus, setFilterStatus] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
-  // Playback timer simulation
+  // Sync real video player with isPlaying
+  useEffect(() => {
+    const vid = videoRef.current
+    if (!vid) return
+    if (isPlaying) {
+      vid.play().catch(() => {})
+    } else {
+      vid.pause()
+    }
+  }, [isPlaying, clip?.id])
+
+  // Sync seek if needed
+  useEffect(() => {
+    const vid = videoRef.current
+    if (!vid) return
+    if (Math.abs(vid.currentTime - currentTime) > 0.4) {
+      vid.currentTime = currentTime
+    }
+  }, [currentTime])
+
+  // Playback timer simulation (fallback if video element not active)
   useEffect(() => {
     let animFrame: number
     let lastTime = performance.now()
 
-    if (isPlaying && clip) {
+    if (isPlaying && clip && !videoRef.current) {
       const step = (now: number) => {
         const delta = (now - lastTime) / 1000
         lastTime = now
@@ -327,14 +350,26 @@ export const ClipReviewStudio: React.FC = () => {
           <div className="p-4 flex flex-col items-center justify-center space-y-4">
             {/* 9:16 Mobile Player Canvas */}
             <div className="relative w-[300px] h-[533px] bg-black rounded-card border border-border shadow-2xl overflow-hidden select-none group">
-              {/* Simulated Video Frame Background */}
-              <img
-                src={clip.thumbnailUrl}
-                alt="Video frame"
-                className={`w-full h-full object-cover transition-transform duration-700 ${
-                  isPlaying ? 'scale-105' : 'scale-100'
-                }`}
-              />
+              {clip.videoUrl ? (
+                <video
+                  ref={videoRef}
+                  src={clip.videoUrl}
+                  poster={clip.thumbnailUrl}
+                  className="w-full h-full object-cover"
+                  playsInline
+                  muted={isMuted}
+                  loop
+                  onTimeUpdate={(e) => setCurrentTime((e.target as HTMLVideoElement).currentTime)}
+                />
+              ) : (
+                <img
+                  src={clip.thumbnailUrl}
+                  alt="Video frame"
+                  className={`w-full h-full object-cover transition-transform duration-700 ${
+                    isPlaying ? 'scale-105' : 'scale-100'
+                  }`}
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
 
               {/* Top Context Headline Overlay (NO UGLY BOX!) */}
