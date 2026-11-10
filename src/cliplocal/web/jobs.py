@@ -7,7 +7,7 @@ from src.cliplocal.core.models import (
     JobState, JobStatus, VideoMetadata, CandidateClip,
     CaptionStyleName, ReframeMode
 )
-from src.cliplocal.web.db import save_job, get_job, delete_job as db_delete_job
+from src.cliplocal.web.db import save_job, get_job, delete_job as db_delete_job, checkpoint_db
 from src.cliplocal.ingest.downloader import is_url, download_video
 from src.cliplocal.ingest.probe import probe_video
 from src.cliplocal.ingest.audio import extract_normalized_audio
@@ -44,6 +44,7 @@ class JobManager:
                     job.log_messages.append(f"❌ Error: {e}")
                     self._persist_job(job, options)
             finally:
+                checkpoint_db()
                 self.queue.task_done()
 
     def _persist_job(self, job: JobState, options: dict):

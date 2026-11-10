@@ -27,7 +27,8 @@ def test_circuit_breaker_3_state_lifecycle():
     # 4. After cooldown (0.2s), transitions to HALF-OPEN
     time.sleep(0.18)
     assert breaker.state == CircuitState.HALF_OPEN
-    assert breaker.can_execute() is True # allows 1 probe
+    assert breaker.can_execute() is True # allows exactly 1 probe
+    assert breaker.can_execute() is False # second call blocked while probe inflight
 
     # 5. Probe failure restarts cooldown and returns to OPEN
     breaker.record_failure()
@@ -109,3 +110,10 @@ def test_sqlite_wal_and_indexes():
         indexes = [row[1] for row in cursor.fetchall()]
         assert "idx_jobs_status_created" in indexes
         assert "idx_jobs_source" in indexes
+
+def test_transformation_log_config_and_provenance():
+    from src.cliplocal.ingest.license import load_channels_config
+    allowlist, claimants = load_channels_config()
+    assert "ted" in allowlist
+    assert "nasa" in allowlist
+    assert "warner music" in claimants

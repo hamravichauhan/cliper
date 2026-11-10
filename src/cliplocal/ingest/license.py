@@ -1,7 +1,11 @@
 import re
-from typing import Dict, Any, Optional
+import json
+from pathlib import Path
+from typing import Dict, Any, Optional, Tuple, Set
 
-CC_ALLOWLIST_CHANNELS = {
+CONFIG_FILE = Path(__file__).resolve().parent.parent / "config" / "cc_channels.json"
+
+DEFAULT_CC_ALLOWLIST = {
     "ted",
     "tedx",
     "blender foundation",
@@ -15,7 +19,7 @@ CC_ALLOWLIST_CHANNELS = {
     "veritasium"
 }
 
-AGGRESSIVE_CLAIMANT_KEYWORDS = {
+DEFAULT_CLAIMANTS = {
     "warner music",
     "universal music",
     "sony music",
@@ -31,6 +35,17 @@ AGGRESSIVE_CLAIMANT_KEYWORDS = {
     "formula 1",
     "f1"
 }
+
+def load_channels_config() -> Tuple[Set[str], Set[str]]:
+    """Load configurable allowlist channels and aggressive claimant keywords from JSON file."""
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return set(data.get("allowlist_channels", [])), set(data.get("aggressive_claimants", []))
+        except Exception:
+            pass
+    return DEFAULT_CC_ALLOWLIST, DEFAULT_CLAIMANTS
 
 CC_DESCRIPTION_REGEX = re.compile(
     r"(creative\s+commons|cc[-_\s]?by|reuse\s+allowed|attribution\s+(?:4\.0|3\.0)|cc\s+license)",
@@ -48,6 +63,7 @@ def analyze_video_license(
     Uses multi-signal detection: yt-dlp license tags, description text regex, and creator allowlists.
     Always defaults to 'standard' (yellow) when uncertain - never falsely flags as green.
     """
+    allowlist, claimants = load_channels_config()
     info = info_dict or {}
     raw_license = str(info.get("license") or "")
     is_cc_flag = bool(info.get("is_creative_commons", False))
@@ -55,7 +71,7 @@ def analyze_video_license(
     clean_desc = (description or info.get("description") or "").strip()
 
     # 1. Check for aggressive claimant entities (High Risk)
-    for claimant in AGGRESSIVE_CLAIMANT_KEYWORDS:
+    for claimant in claimants:
         if claimant in clean_channel:
             return {
                 "is_creative_commons": False,
@@ -76,7 +92,7 @@ def analyze_video_license(
         }
 
     # 3. Check Channel Allowlists
-    for allowed in CC_ALLOWLIST_CHANNELS:
+    for allowed in allowlist:
         if allowed in clean_channel:
             return {
                 "is_creative_commons": True,

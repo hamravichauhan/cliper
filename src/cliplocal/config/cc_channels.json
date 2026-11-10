@@ -1,0 +1,31 @@
+{
+  "allowlist_channels": [
+    "ted",
+    "tedx",
+    "blender foundation",
+    "nasa",
+    "y combinator",
+    "stanford",
+    "mit opencourseware",
+    "crashcourse",
+    "khan academy",
+    "wikimedia",
+    "veritasium"
+  ],
+  "aggressive_claimants": [
+    "warner music",
+    "universal music",
+    "sony music",
+    "vevo",
+    "wmg",
+    "sme",
+    "umg",
+    "nba",
+    "fifa",
+    "uefa",
+    "ufc",
+    "wwe",
+    "formula 1",
+    "f1"
+  ]
+}

@@ -29,6 +29,7 @@ class CircuitBreaker:
         self.cooldown_sec = cooldown_sec
         self._state = CircuitState.CLOSED
         self._last_failure_time: float = 0.0
+        self._probe_allowed: bool = False
         self._lock = threading.Lock()
 
     @property
@@ -37,30 +38,42 @@ class CircuitBreaker:
             if self._state == CircuitState.OPEN:
                 if time.time() - self._last_failure_time >= self.cooldown_sec:
                     self._state = CircuitState.HALF_OPEN
+                    self._probe_allowed = True
             return self._state
 
     def record_success(self):
         with self._lock:
             self._state = CircuitState.CLOSED
+            self._probe_allowed = False
             self._last_failure_time = 0.0
 
     def record_failure(self):
         with self._lock:
             self._state = CircuitState.OPEN
+            self._probe_allowed = False
             self._last_failure_time = time.time()
 
     def can_execute(self) -> bool:
-        """Check whether a request is permitted to proceed."""
-        current_state = self.state
-        if current_state == CircuitState.CLOSED:
-            return True
-        elif current_state == CircuitState.HALF_OPEN:
-            return True
-        return False
+        """Check whether a request is permitted to proceed (permits exactly 1 probe in HALF_OPEN)."""
+        with self._lock:
+            if self._state == CircuitState.OPEN:
+                if time.time() - self._last_failure_time >= self.cooldown_sec:
+                    self._state = CircuitState.HALF_OPEN
+                    self._probe_allowed = True
+
+            if self._state == CircuitState.CLOSED:
+                return True
+            elif self._state == CircuitState.HALF_OPEN:
+                if self._probe_allowed:
+                    self._probe_allowed = False
+                    return True
+                return False
+            return False
 
     def reset(self):
         with self._lock:
             self._state = CircuitState.CLOSED
+            self._probe_allowed = False
             self._last_failure_time = 0.0
 
 # Process-wide singleton circuit breaker for Ollama LLM

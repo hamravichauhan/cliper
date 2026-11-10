@@ -1,4 +1,5 @@
 import httpx
+import concurrent.futures
 from typing import Optional, List, Dict, Any
 from src.cliplocal.config.settings import config
 from src.cliplocal.llm.circuit_breaker import ollama_circuit_breaker
@@ -48,8 +49,18 @@ class OllamaClient:
             pass
         return []
 
+    def _raw_generate_post(self, payload: dict) -> Optional[str]:
+        with httpx.Client(timeout=self.timeout) as client:
+            res = client.post(f"{self.host}/api/generate", json=payload)
+            if res.status_code == 200:
+                return res.json().get("response")
+        return None
+
     def generate(self, prompt: str, system_prompt: Optional[str] = None) -> Optional[str]:
-        """Generate response from local Ollama model with circuit breaker protection."""
+        """
+        Generate response from local Ollama model with hard wall-clock timeout & circuit breaker protection.
+        Uses ThreadPoolExecutor to enforce an 8s hard wall-clock limit, immune to slow token streaming.
+        """
         if not ollama_circuit_breaker.can_execute():
             return None
 
@@ -65,16 +76,20 @@ class OllamaClient:
         if system_prompt:
             payload["system"] = system_prompt
 
-        try:
-            with httpx.Client(timeout=self.timeout) as client:
-                res = client.post(f"{self.host}/api/generate", json=payload)
-                if res.status_code == 200:
+        # Enforce hard wall-clock timeout via concurrent.futures ThreadPoolExecutor
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(self._raw_generate_post, payload)
+            try:
+                response = future.result(timeout=self.timeout)
+                if response:
                     ollama_circuit_breaker.record_success()
-                    return res.json().get("response")
+                    return response
                 else:
                     ollama_circuit_breaker.record_failure()
-        except Exception:
-            # Trip or increment circuit breaker failure count
-            ollama_circuit_breaker.record_failure()
+            except concurrent.futures.TimeoutError:
+                # Hard wall-clock limit exceeded
+                ollama_circuit_breaker.record_failure()
+            except Exception:
+                ollama_circuit_breaker.record_failure()
 
         return None

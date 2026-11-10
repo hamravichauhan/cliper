@@ -300,6 +300,11 @@ def render_candidate_clip(
 
     # 7. Write JSON sidecar
     import datetime
+    import hashlib
+
+    weights_dict = config.get("scoring", {}).get("weights", {})
+    weights_json = json.dumps(weights_dict, sort_keys=True)
+    scoring_weights_hash = hashlib.sha256(weights_json.encode("utf-8")).hexdigest()[:12]
 
     # Full source provenance block
     source_info = {
@@ -326,6 +331,9 @@ def render_candidate_clip(
     }
 
     sidecar_data = {
+        "cliplocal_version": "1.0.0",
+        "transformation_pipeline_version": "v2.1-apple-videotoolbox",
+        "scoring_weights_hash": scoring_weights_hash,
         "legal_notice": "This document logs automated creative transformations. It constitutes technical metadata, not legal fair-use determination. Users bear sole responsibility for copyright compliance.",
         "source": source_info,
         "transformation_factors": transformation_factors,
