@@ -285,6 +285,59 @@ def watch(
     )
 
 @app.command()
+def find(
+    query: str = typer.Argument(..., help="Search query (e.g. 'naval ravikant', 'huberman dopamine', 'alex hormozi')"),
+    limit: int = typer.Option(5, "--limit", "-l", help="Number of viral videos to show"),
+    min_mins: int = typer.Option(10, "--min-mins", help="Minimum video length in minutes"),
+    clip: bool = typer.Option(False, "--clip", help="Automatically download and clip the #1 top-viewed video"),
+    style: str = typer.Option("hormozi", "--style", "-s", help="Caption style if --clip is set"),
+    anti_copyright: bool = typer.Option(True, "--anti-copyright", help="Apply anti-copyright protection if --clip is set")
+):
+    """Viral Long Video Finder: Search YouTube for top-performing long talks & podcasts ranked by view count."""
+    from rich.table import Table
+    from src.cliplocal.discovery.finder import search_viral_long_videos
+
+    console.print(f"[bold cyan]🔍 Searching YouTube for viral long-form videos:[/] \"{query}\" (min {min_mins} mins)...")
+    results = search_viral_long_videos(query=query, min_duration_sec=min_mins * 60, limit=limit)
+
+    if not results:
+        console.print("[yellow]No matching long-form videos found.[/]")
+        return
+
+    table = Table(title=f"Viral Long Videos: \"{query}\"", show_header=True, header_style="bold magenta")
+    table.add_column("#", style="dim", width=4)
+    table.add_column("Title", style="bold white")
+    table.add_column("Channel", style="cyan")
+    table.add_column("Views", style="bold green", justify="right")
+    table.add_column("Duration", style="yellow", justify="right")
+    table.add_column("URL", style="dim")
+
+    for i, v in enumerate(results, start=1):
+        table.add_row(
+            str(i),
+            v.title[:55],
+            v.channel[:22],
+            v.view_count_formatted,
+            v.duration_formatted,
+            v.url
+        )
+
+    console.print(table)
+
+    if clip and results:
+        top_vid = results[0]
+        console.print(f"\n[bold green]🚀 Automatically launching clipping pipeline for #1 video:[/] {top_vid.title} ({top_vid.view_count_formatted})")
+        caption_style = CaptionStyleName(style) if style in [e.value for e in CaptionStyleName] else CaptionStyleName.HORMOZI
+        run_pipeline(
+            source=top_vid.url,
+            num_clips=5,
+            style=caption_style,
+            anti_copyright=anti_copyright,
+            multicam=True,
+            top_banner=True
+        )
+
+@app.command()
 def benchmark(
     audio_path: str = typer.Argument(..., help="Path to sample audio file to benchmark")
 ):

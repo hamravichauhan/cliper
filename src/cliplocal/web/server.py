@@ -19,6 +19,7 @@ from src.cliplocal.captions.ass_generator import generate_ass_subtitles
 from src.cliplocal.export.delivery import create_client_delivery_bundle
 from src.cliplocal.export.scheduler import export_bulk_schedule_csv
 from src.cliplocal.harvest.monitor import detect_unprocessed_videos
+from src.cliplocal.discovery.finder import search_viral_long_videos, CURATED_PRESETS
 from src.cliplocal.config.settings import config
 
 app = FastAPI(title="ClipLocal API", version="1.0.0")
@@ -251,6 +252,14 @@ async def harvest_channel(req: HarvestRequest):
         started_jobs.append({"title": vid["title"], "url": vid["url"], "job_id": job.job_id})
 
     return {"detected_count": len(new_vids), "started_jobs": started_jobs}
+
+@app.get("/api/discover/presets")
+async def get_discover_presets():
+    return CURATED_PRESETS
+
+@app.get("/api/discover/search")
+async def search_discover_videos(query: str, limit: int = 6):
+    return search_viral_long_videos(query=query, limit=limit)
 
 # Mount frontend build directory if it exists
 frontend_dist = Path("web/frontend/dist")

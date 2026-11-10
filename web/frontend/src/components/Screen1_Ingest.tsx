@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { UploadCloud, Link as LinkIcon, Sparkles, Sliders, Play, Terminal, CheckCircle2, AlertCircle, ShieldAlert } from 'lucide-react'
+import { UploadCloud, Link as LinkIcon, Sparkles, Sliders, Play, Terminal, CheckCircle2, AlertCircle, ShieldAlert, Search, Flame } from 'lucide-react'
 
 interface Props {
   onJobStarted: (jobId: string) => void
@@ -7,8 +7,12 @@ interface Props {
 }
 
 export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) => {
-  const [sourceType, setSourceType] = useState<'url' | 'file'>('url')
+  const [sourceType, setSourceType] = useState<'discover' | 'url' | 'file'>('discover')
   const [url, setUrl] = useState('')
+  const [selectedTitle, setSelectedTitle] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [clipsCount, setClipsCount] = useState(5)
   const [minDuration, setMinDuration] = useState(20)
@@ -28,6 +32,24 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
   const [watermark, setWatermark] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
+
+  useEffect(() => {
+    handleSearch('naval ravikant joe rogan')
+  }, [])
+
+  const handleSearch = async (q: string) => {
+    if (!q.trim()) return
+    setIsSearching(true)
+    try {
+      const res = await fetch(`/api/discover/search?query=${encodeURIComponent(q)}&limit=6`)
+      const data = await res.json()
+      setSearchResults(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsSearching(false)
+    }
+  }
 
   const handleStart = async () => {
     setIsSubmitting(true)
@@ -94,12 +116,20 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-sm space-y-6">
         <div className="flex border-b border-slate-800 pb-4 gap-4">
           <button
+            onClick={() => setSourceType('discover')}
+            className={`flex items-center gap-2 pb-2 text-sm font-semibold transition-colors border-b-2 ${
+              sourceType === 'discover' ? 'border-violet-500 text-violet-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Flame className="w-4 h-4 text-amber-400" /> Discover Viral Videos
+          </button>
+          <button
             onClick={() => setSourceType('url')}
             className={`flex items-center gap-2 pb-2 text-sm font-semibold transition-colors border-b-2 ${
               sourceType === 'url' ? 'border-violet-500 text-violet-400' : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <LinkIcon className="w-4 h-4" /> YouTube / Web URL
+            <LinkIcon className="w-4 h-4" /> Paste Video URL
           </button>
           <button
             onClick={() => setSourceType('file')}
@@ -111,7 +141,115 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
           </button>
         </div>
 
-        {sourceType === 'url' ? (
+        {sourceType === 'discover' ? (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Search any creator or topic (e.g. 'naval ravikant', 'huberman dopamine', 'alex hormozi')..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchQuery)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-violet-500 transition-colors"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSearch(searchQuery)}
+                disabled={isSearching}
+                className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50"
+              >
+                {isSearching ? 'Searching...' : 'Search'}
+              </button>
+            </div>
+
+            {/* Quick Niche Chips */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-slate-500 font-semibold text-[11px] uppercase">Proven Goldmines:</span>
+              {[
+                'Naval Ravikant',
+                'Alex Hormozi',
+                'Huberman Focus',
+                'David Goggins',
+                'Y Combinator Lecture',
+                'Steve Jobs Speech'
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery(chip)
+                    handleSearch(chip)
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs border border-slate-700/60 transition-colors"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+
+            {/* Selected Video Pill */}
+            {url && (
+              <div className="p-3 bg-violet-500/10 border border-violet-500/30 rounded-xl flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-violet-400 font-bold block">Selected Video to Clip:</span>
+                  <span className="text-slate-300 font-mono text-[11px] truncate max-w-xl block">
+                    {selectedTitle || url}
+                  </span>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
+                  READY
+                </span>
+              </div>
+            )}
+
+            {/* Search Results Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-72 overflow-y-auto pt-2">
+              {searchResults.map((v: any) => (
+                <div
+                  key={v.id}
+                  className={`bg-slate-950 border rounded-xl overflow-hidden flex flex-col justify-between transition-all hover:border-violet-500/60 ${
+                    url === v.url ? 'border-violet-500 ring-1 ring-violet-500' : 'border-slate-800'
+                  }`}
+                >
+                  <div className="relative aspect-video bg-black">
+                    <img src={v.thumbnail_url} alt={v.title} className="w-full h-full object-cover" />
+                    <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono text-white">
+                      {v.duration_formatted}
+                    </span>
+                    <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-amber-500/90 text-[10px] font-bold text-black flex items-center gap-0.5">
+                      <Flame className="w-2.5 h-2.5" /> {v.view_count_formatted}
+                    </span>
+                  </div>
+                  <div className="p-2.5 flex-1 flex flex-col justify-between space-y-2">
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-200 line-clamp-2 leading-tight">
+                        {v.title}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 mt-1">{v.channel}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUrl(v.url)
+                        setSelectedTitle(v.title)
+                      }}
+                      className={`w-full py-1.5 px-2 rounded-lg text-xs font-bold transition-colors ${
+                        url === v.url
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-violet-600/30 hover:bg-violet-600/50 text-violet-300 border border-violet-500/30'
+                      }`}
+                    >
+                      {url === v.url ? '✔ Selected' : '⚡ Clip This Video'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : sourceType === 'url' ? (
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
               Video URL (YouTube, Vimeo, etc.)
