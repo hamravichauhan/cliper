@@ -9,3 +9,4 @@ __pycache__/
 fixtures/tmp_*
 node_modules/
 dist/
+src/cliplocal/assets/music/*.wav

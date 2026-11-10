@@ -54,6 +54,9 @@ class SubmitJobRequest(BaseModel):
     include_emojis: bool = True
     include_sfx: bool = True
     background_music: bool = False
+    mute_original: bool = False
+    music_track: Optional[str] = "ambient_lofi"
+    music_volume: float = 0.22
     anti_copyright: bool = False
     broll: bool = False
     watermark: Optional[str] = None
@@ -169,6 +172,9 @@ class ReRenderRequest(BaseModel):
     include_emojis: bool = True
     include_sfx: bool = True
     background_music: bool = False
+    mute_original: bool = False
+    music_track: Optional[str] = "ambient_lofi"
+    music_volume: float = 0.22
     anti_copyright: bool = False
     broll: bool = False
     watermark: Optional[str] = None
@@ -210,6 +216,9 @@ async def re_render_clip(req: ReRenderRequest):
         include_emojis=req.include_emojis,
         include_sfx=req.include_sfx,
         background_music=req.background_music,
+        mute_original=req.mute_original,
+        music_track=req.music_track,
+        music_volume=req.music_volume,
         anti_copyright=req.anti_copyright,
         broll=req.broll,
         extract_thumbnails=True

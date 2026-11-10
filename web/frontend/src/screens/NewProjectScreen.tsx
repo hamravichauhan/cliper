@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
-import { CaptionStyle, CAPTION_STYLE_OPTIONS } from '../types'
+import { CaptionStyle, CAPTION_STYLE_OPTIONS, SongOption, SONG_PRESETS } from '../types'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Slider } from '../components/ui/Slider'
@@ -23,7 +23,10 @@ import {
   RefreshCw,
   ExternalLink,
   Clock,
-  Play
+  Play,
+  Volume2,
+  VolumeX,
+  Music
 } from 'lucide-react'
 
 export const NewProjectScreen: React.FC = () => {
@@ -53,7 +56,11 @@ export const NewProjectScreen: React.FC = () => {
   const [multiCam, setMultiCam] = useState(true)
   const [faceTracking, setFaceTracking] = useState(true)
   const [sfx, setSfx] = useState(true)
-  const [music, setMusic] = useState(false)
+  const [muteOriginal, setMuteOriginal] = useState(false)
+  const [addSong, setAddSong] = useState(false)
+  const [selectedSong, setSelectedSong] = useState('ambient_lofi')
+  const [songVolume, setSongVolume] = useState(70)
+  const [customSongFile, setCustomSongFile] = useState<string | null>(null)
 
   // Initial discover search on mount
   useEffect(() => {
@@ -148,7 +155,10 @@ export const NewProjectScreen: React.FC = () => {
       top_banner: true,
       include_emojis: true,
       include_sfx: sfx,
-      background_music: music,
+      background_music: addSong,
+      mute_original: muteOriginal,
+      music_track: customSongFile || selectedSong,
+      music_volume: muteOriginal ? (songVolume / 100) : Number(((songVolume / 100) * 0.35).toFixed(2)),
       anti_copyright: true
     })
 
@@ -509,13 +519,123 @@ export const NewProjectScreen: React.FC = () => {
               />
 
               <Toggle
-                label="Background Music Ducking"
-                description="Subtly mixes high-tension lo-fi beneath dialogue."
-                checked={music}
-                onChange={setMusic}
+                label="Mute Original Video Audio"
+                description="Silence speaker dialogue and background noise from the video completely."
+                checked={muteOriginal}
+                onChange={setMuteOriginal}
+              />
+
+              <Toggle
+                label="Add Viral Song / Background Music"
+                description="Layer a trending soundtrack or beat over the vertical clip."
+                checked={addSong}
+                onChange={setAddSong}
               />
             </div>
           </div>
+
+          {/* Song / Audio Layering Selector */}
+          {addSong && (
+            <div className="p-4 bg-[#141417] border border-border rounded-control space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
+                    <Music className="w-3.5 h-3.5 text-accent" />
+                    Select Background Song / Beat
+                  </h4>
+                  <p className="text-[11px] text-text-muted mt-0.5">
+                    {muteOriginal
+                      ? '⚡ Original video is MUTED. This song will play as the full primary soundtrack.'
+                      : '🎧 Original dialogue is ACTIVE. Song will smoothly duck beneath speech.'}
+                  </p>
+                </div>
+
+                <Badge variant={muteOriginal ? 'accent' : 'primary'} size="sm">
+                  {muteOriginal ? 'Primary Soundtrack' : 'Auto-Ducked Background'}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {SONG_PRESETS.map((song) => {
+                  const isSelected = selectedSong === song.id && !customSongFile
+                  return (
+                    <button
+                      key={song.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSong(song.id)
+                        setCustomSongFile(null)
+                      }}
+                      className={`p-3 rounded-control border text-left transition-all ${
+                        isSelected
+                          ? 'bg-bg-elevated border-accent ring-1 ring-accent/30 shadow-sm'
+                          : 'bg-[#18181B] border-border hover:border-[#3F3F46]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-base">{song.icon}</span>
+                        <span className="text-[10px] font-mono text-accent">{song.bpm} BPM</span>
+                      </div>
+                      <p className="text-xs font-bold text-text-primary truncate">{song.name}</p>
+                      <p className="text-[10px] text-text-muted truncate mt-0.5">{song.genre}</p>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Volume Slider & Custom Upload */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border/60">
+                <Slider
+                  label="Song Volume Level"
+                  min={10}
+                  max={100}
+                  value={songVolume}
+                  unit="%"
+                  onChange={setSongVolume}
+                />
+
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                    Or Use Custom Song File (.mp3, .wav)
+                  </label>
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        const formData = new FormData()
+                        formData.append('file', file)
+                        try {
+                          const res = await fetch('/api/upload', {
+                            method: 'POST',
+                            body: formData
+                          })
+                          if (res.ok) {
+                            const data = await res.json()
+                            setCustomSongFile(data.file_path)
+                            addToast({
+                              title: 'Custom Song Uploaded',
+                              description: file.name,
+                              type: 'success'
+                            })
+                          }
+                        } catch {
+                          addToast({ title: 'Upload Failed', type: 'danger' })
+                        }
+                      }
+                    }}
+                    className="w-full text-xs text-text-muted file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-[11px] file:font-semibold file:bg-bg-elevated file:text-text-primary hover:file:bg-[#27272A] file:cursor-pointer"
+                  />
+                  {customSongFile && (
+                    <span className="text-[10px] text-accent mt-1 block font-mono truncate">
+                      ✓ Active custom track: {customSongFile.split('/').pop()}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Visual Caption Style Selector - All 7 Presets */}
           <div className="pt-4 border-t border-border/80 space-y-2.5">

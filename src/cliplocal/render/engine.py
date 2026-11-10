@@ -49,6 +49,9 @@ def render_candidate_clip(
     include_emojis: bool = True,
     include_sfx: bool = True,
     background_music: bool = False,
+    mute_original: bool = False,
+    music_track: Optional[str] = None,
+    music_volume: float = 0.22,
     anti_copyright: bool = False,
     broll: bool = False,
     extract_thumbnails: bool = True,
@@ -245,9 +248,21 @@ def render_candidate_clip(
         audio_filter_parts.append(a_trans_filter)
         current_audio_label = next_a_label
 
-    # Optional Background Music with Auto-Ducking
-    if background_music:
-        music_path = ensure_ambient_music()
+    # Optional Background Music or Song Layering with Muting / Auto-Ducking
+    has_song = background_music or bool(music_track)
+    if mute_original:
+        if has_song:
+            music_path = ensure_ambient_music(music_track or "ambient_lofi")
+            extra_inputs.append(str(music_path))
+            music_input_idx = next_input_idx
+            next_input_idx += 1
+            audio_filter_parts.append(f"[{music_input_idx}:a]volume={music_volume or 0.85}[a_music_only]")
+            current_audio_label = "a_music_only"
+        else:
+            audio_filter_parts.append(f"[{current_audio_label}]volume=0.0[a_muted]")
+            current_audio_label = "a_muted"
+    elif has_song:
+        music_path = ensure_ambient_music(music_track or "ambient_lofi")
         extra_inputs.append(str(music_path))
         music_input_idx = next_input_idx
         next_input_idx += 1
@@ -257,7 +272,7 @@ def render_candidate_clip(
             music_input_index=music_input_idx,
             duck_threshold=0.08,
             duck_ratio=8.0,
-            music_volume=0.20
+            music_volume=music_volume or 0.22
         )
         audio_filter_parts.append(duck_filter)
         current_audio_label = "a_mixed"

@@ -115,6 +115,50 @@ export const CAPTION_STYLE_OPTIONS: CaptionStyleOption[] = [
   }
 ]
 
+export interface SongOption {
+  id: string
+  name: string
+  genre: string
+  desc: string
+  bpm: number
+  icon: string
+}
+
+export const SONG_PRESETS: SongOption[] = [
+  {
+    id: 'ambient_lofi',
+    name: 'Chill Lo-Fi',
+    genre: 'Lo-Fi / Chillhop',
+    desc: 'Warm Rhodes chords and vinyl textures, perfect for wisdom & podcasts',
+    bpm: 80,
+    icon: '🎵'
+  },
+  {
+    id: 'phonk_drift',
+    name: 'Phonk Drift',
+    genre: 'Drift Phonk / Gym',
+    desc: 'Distorted 808 sub-bass with aggressive rhythm for viral gym & motivational shorts',
+    bpm: 135,
+    icon: '⚡'
+  },
+  {
+    id: 'synthwave',
+    name: 'Retro Synthwave',
+    genre: 'Electronic / Synth',
+    desc: 'Driving 80s bassline with melodic arpeggios for tech & gaming hooks',
+    bpm: 115,
+    icon: '🌌'
+  },
+  {
+    id: 'cinematic',
+    name: 'Cinematic Tension',
+    genre: 'Suspense / Drama',
+    desc: 'Deep sub-bass drone with rising string swells for dramatic payoffs',
+    bpm: 90,
+    icon: '🎬'
+  }
+]
+
 export interface Clip {
   id: string
   index: number

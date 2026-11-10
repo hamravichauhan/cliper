@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store/useStore'
-import { Clip, WordTimestamp, CAPTION_STYLE_OPTIONS } from '../types'
+import { Clip, WordTimestamp, CAPTION_STYLE_OPTIONS, SONG_PRESETS } from '../types'
 import { ScoreRing } from '../components/ui/ScoreRing'
 import { ScoreBar } from '../components/ui/ScoreBar'
 import { Button } from '../components/ui/Button'
@@ -33,6 +33,7 @@ import {
   FileText,
   Share2,
   ShieldAlert,
+  Music,
   ChevronRight,
   Maximize2
 } from 'lucide-react'
@@ -71,10 +72,18 @@ export const ClipReviewStudio: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Local inspector tab
-  const [inspectorTab, setInspectorTab] = useState<'details' | 'captions' | 'copy' | 'brand'>('details')
+  const [inspectorTab, setInspectorTab] = useState<'details' | 'captions' | 'audio' | 'copy' | 'brand'>('details')
   const [filterStatus, setFilterStatus] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // Audio & Song overlay state
+  const [clipMuteOriginal, setClipMuteOriginal] = useState(false)
+  const [clipAddSong, setClipAddSong] = useState(false)
+  const [clipSong, setClipSong] = useState('ambient_lofi')
+  const [clipSongVolume, setClipSongVolume] = useState(70)
+  const [clipCustomSong, setClipCustomSong] = useState<string | null>(null)
+  const [isAudioReRendering, setIsAudioReRendering] = useState(false)
 
   // Sync real video player with isPlaying
   useEffect(() => {
@@ -552,6 +561,7 @@ export const ClipReviewStudio: React.FC = () => {
               tabs={[
                 { id: 'details', label: 'Details' },
                 { id: 'captions', label: 'Captions' },
+                { id: 'audio', label: 'Audio & Song' },
                 { id: 'copy', label: 'Copy' },
                 { id: 'brand', label: 'Brand' }
               ]}
@@ -699,6 +709,165 @@ export const ClipReviewStudio: React.FC = () => {
                   }
                 >
                   Apply & Re-render Video
+                </Button>
+              </div>
+            )}
+
+            {/* TAB: AUDIO & SONG */}
+            {inspectorTab === 'audio' && (
+              <div className="space-y-4">
+                <div className="p-3.5 bg-[#18181B] border border-border rounded-control space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
+                      {clipMuteOriginal ? (
+                        <VolumeX className="w-3.5 h-3.5 text-danger" />
+                      ) : (
+                        <Volume2 className="w-3.5 h-3.5 text-accent" />
+                      )}
+                      Original Video Audio
+                    </span>
+                    <Badge variant={clipMuteOriginal ? 'danger' : 'accent'} size="sm">
+                      {clipMuteOriginal ? 'Muted' : 'Audible (100%)'}
+                    </Badge>
+                  </div>
+
+                  <Toggle
+                    label="Mute Video Audio Completely"
+                    description="Silence dialogue and background noise from the source video."
+                    checked={clipMuteOriginal}
+                    onChange={setClipMuteOriginal}
+                  />
+                </div>
+
+                <div className="p-3.5 bg-[#18181B] border border-border rounded-control space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
+                      <Music className="w-3.5 h-3.5 text-accent" />
+                      Background Song / Track
+                    </span>
+                    <Badge variant={clipAddSong ? 'accent' : 'muted'} size="sm">
+                      {clipAddSong ? 'Active' : 'Disabled'}
+                    </Badge>
+                  </div>
+
+                  <Toggle
+                    label="Layer Song / Beat Over Clip"
+                    description="Add viral music beneath dialogue or as the primary soundtrack."
+                    checked={clipAddSong}
+                    onChange={setClipAddSong}
+                  />
+
+                  {clipAddSong && (
+                    <div className="pt-2 space-y-3 border-t border-border/60">
+                      <div className="grid grid-cols-2 gap-2">
+                        {SONG_PRESETS.map((song) => {
+                          const isSelected = clipSong === song.id && !clipCustomSong
+                          return (
+                            <button
+                              key={song.id}
+                              type="button"
+                              onClick={() => {
+                                setClipSong(song.id)
+                                setClipCustomSong(null)
+                              }}
+                              className={`p-2 rounded-control border text-left transition-all ${
+                                isSelected
+                                  ? 'bg-bg-elevated border-accent ring-1 ring-accent/30'
+                                  : 'bg-[#141416] border-border hover:border-[#3F3F46]'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-sm">{song.icon}</span>
+                                <span className="text-[9px] font-mono text-accent">{song.bpm} BPM</span>
+                              </div>
+                              <p className="text-xs font-semibold text-text-primary truncate">{song.name}</p>
+                              <p className="text-[10px] text-text-muted truncate">{song.genre}</p>
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      <Slider
+                        label="Song Volume Level"
+                        min={10}
+                        max={100}
+                        value={clipSongVolume}
+                        unit="%"
+                        onChange={setClipSongVolume}
+                      />
+
+                      <div>
+                        <label className="block text-xs font-medium text-text-secondary mb-1">
+                          Upload Custom Track (.mp3, .wav)
+                        </label>
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              const formData = new FormData()
+                              formData.append('file', file)
+                              try {
+                                const res = await fetch('/api/upload', {
+                                  method: 'POST',
+                                  body: formData
+                                })
+                                if (res.ok) {
+                                  const data = await res.json()
+                                  setClipCustomSong(data.file_path)
+                                  addToast({
+                                    title: 'Custom Audio Loaded',
+                                    description: file.name,
+                                    type: 'success'
+                                  })
+                                }
+                              } catch {
+                                addToast({ title: 'Upload Failed', type: 'danger' })
+                              }
+                            }
+                          }}
+                          className="w-full text-xs text-text-muted file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-bg-elevated file:text-text-primary hover:file:bg-[#27272A] file:cursor-pointer"
+                        />
+                        {clipCustomSong && (
+                          <span className="text-[10px] text-accent mt-1 block font-mono truncate">
+                            ✓ {clipCustomSong.split('/').pop()}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="p-2.5 rounded bg-bg-surface border border-border text-[11px] text-text-secondary leading-relaxed">
+                        {clipMuteOriginal
+                          ? '⚡ Original video dialogue is muted. This song will play as the full primary soundtrack.'
+                          : '🎧 Original dialogue is audible. This song will automatically duck smoothly beneath spoken sentences.'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full"
+                  disabled={isAudioReRendering}
+                  icon={<Sparkles className="w-3.5 h-3.5" />}
+                  onClick={async () => {
+                    setIsAudioReRendering(true)
+                    try {
+                      await reRenderCurrentClip(clip.id, {
+                        mute_original: clipMuteOriginal,
+                        background_music: clipAddSong,
+                        music_track: clipCustomSong || clipSong,
+                        music_volume: clipMuteOriginal
+                          ? clipSongVolume / 100
+                          : Number(((clipSongVolume / 100) * 0.35).toFixed(2))
+                      })
+                    } finally {
+                      setIsAudioReRendering(false)
+                    }
+                  }}
+                >
+                  {isAudioReRendering ? 'Re-Rendering Audio with VideoToolbox...' : 'Apply & Re-Render Audio'}
                 </Button>
               </div>
             )}
