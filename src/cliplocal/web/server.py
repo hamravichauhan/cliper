@@ -1,6 +1,7 @@
 import os
 import shutil
 import mimetypes
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, List
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response
@@ -22,7 +23,12 @@ from src.cliplocal.harvest.monitor import detect_unprocessed_videos
 from src.cliplocal.discovery.finder import search_viral_long_videos, CURATED_PRESETS
 from src.cliplocal.config.settings import config
 
-app = FastAPI(title="ClipLocal API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    job_manager.start_worker()
+    yield
+
+app = FastAPI(title="ClipLocal API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,10 +37,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def on_startup():
-    job_manager.start_worker()
 
 class SubmitJobRequest(BaseModel):
     source: str
