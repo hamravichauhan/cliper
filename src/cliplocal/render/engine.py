@@ -21,6 +21,7 @@ from src.cliplocal.transform.copyright import (
 )
 from src.cliplocal.broll.engine import find_broll_cutaways
 from src.cliplocal.render.thumbnail import extract_viral_thumbnails
+from src.cliplocal.render.watermark import build_watermark_filter
 from src.cliplocal.config.settings import config
 
 _face_tracker: Optional[FaceTracker] = None
@@ -50,7 +51,8 @@ def render_candidate_clip(
     background_music: bool = False,
     anti_copyright: bool = False,
     broll: bool = False,
-    extract_thumbnails: bool = True
+    extract_thumbnails: bool = True,
+    watermark: Optional[str] = None
 ) -> Path:
     """
     Render a short clip with 9:16 framing, simulated multi-cam cuts, burned-in ASS captions,
@@ -188,6 +190,12 @@ def render_candidate_clip(
         video_filter_parts.append(v_trans_filter)
         curr_v_label = next_v_label
 
+    # Optional Social Handle / Watermark Overlay
+    if watermark and watermark.strip():
+        w_filter, next_v_label = build_watermark_filter(curr_v_label, "v_watermarked", handle=watermark)
+        video_filter_parts.append(w_filter)
+        curr_v_label = next_v_label
+
     # Subtitles burn-in
     escaped_ass = str(ass_path).replace("\\", "/").replace(":", "\\:")
     video_filter_parts.append(f"[{curr_v_label}]ass={escaped_ass}[v_out]")
@@ -309,6 +317,7 @@ def render_candidate_clip(
         "background_music": background_music,
         "anti_copyright": anti_copyright,
         "broll": broll,
+        "watermark": watermark,
         "thumbnails": candidate.thumbnails,
         "score_breakdown": candidate.score.model_dump(),
         "transcript_excerpt": candidate.text

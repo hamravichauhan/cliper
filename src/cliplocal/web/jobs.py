@@ -231,7 +231,8 @@ class JobManager:
                 background_music=bool(options.get("background_music", False)),
                 anti_copyright=bool(options.get("anti_copyright", False)),
                 broll=bool(options.get("broll", False)),
-                extract_thumbnails=True
+                extract_thumbnails=True,
+                watermark=options.get("watermark")
             )
             rendered_list.append(cand)
             step_progress = 70.0 + ((i + 1) / len(top_candidates)) * 28.0

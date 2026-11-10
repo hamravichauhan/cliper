@@ -37,7 +37,8 @@ def run_pipeline(
     anti_copyright: bool = False,
     broll: bool = False,
     top_banner: bool = True,
-    output_dir: Optional[Path] = None
+    output_dir: Optional[Path] = None,
+    watermark: Optional[str] = None
 ) -> List[Path]:
     """Execute full ingest -> transcribe -> segment -> score -> render pipeline."""
     timer = StageTimer()
@@ -113,7 +114,8 @@ def run_pipeline(
             background_music=background_music,
             anti_copyright=anti_copyright,
             broll=broll,
-            extract_thumbnails=True
+            extract_thumbnails=True,
+            watermark=watermark
         )
         rendered_files.append(out_file)
         console.print(f"  [green]✔ Rendered:[/] {out_file.name}")
@@ -137,7 +139,8 @@ def run(
     auto_zoom: bool = typer.Option(True, "--auto-zoom/--no-auto-zoom", help="Enable dynamic punch-in zooms"),
     emojis: bool = typer.Option(True, "--emojis/--no-emojis", help="Add contextual animated emojis to captions"),
     sfx: bool = typer.Option(True, "--sfx/--no-sfx", help="Add subtle pop & chime sound effects on hook keywords"),
-    music: bool = typer.Option(False, "--music/--no-music", help="Add ambient lo-fi background music with auto-ducking")
+    music: bool = typer.Option(False, "--music/--no-music", help="Add ambient lo-fi background music with auto-ducking"),
+    watermark: Optional[str] = typer.Option(None, "--watermark", "-w", help="Social handle or brand watermark (e.g. @ClipLocal)")
 ):
     """Transform horizontal video into ranked, captioned, vertical 9:16 short clips."""
     console.print(Panel.fit("[bold green]🎬 ClipLocal Pipeline[/] — Free, Offline Short Clip Generator", style="cyan"))
@@ -158,8 +161,96 @@ def run(
         background_music=music,
         anti_copyright=anti_copyright,
         broll=broll,
-        top_banner=top_banner
+        top_banner=top_banner,
+        watermark=watermark
     )
+
+@app.command()
+def harvest(
+    channel: str = typer.Argument(..., help="YouTube channel or playlist URL to monitor"),
+    clips: int = typer.Option(5, "--clips", "-c", help="Clips to generate per video"),
+    limit: int = typer.Option(2, "--limit", "-l", help="Max latest videos to check"),
+    watermark: Optional[str] = typer.Option(None, "--watermark", "-w", help="Social handle watermark stamp"),
+    anti_copyright: bool = typer.Option(True, "--anti-copyright", help="Apply transformative anti-copyright protection")
+):
+    """Channel Auto-Harvester: monitor a YouTube channel and process new episodes automatically."""
+    from src.cliplocal.harvest.monitor import detect_unprocessed_videos
+
+    console.print(f"[bold cyan]📡 Harvesting channel:[/] {channel}")
+    new_vids = detect_unprocessed_videos([channel], max_per_channel=limit)
+    if not new_vids:
+        console.print("[green]✔ All latest videos have already been processed.[/]")
+        return
+
+    console.print(f"[bold green]▶ Found {len(new_vids)} new unprocessed video(s)![/]")
+    for v in new_vids:
+        console.print(f"\n[cyan]Starting automated clipping for:[/] {v['title']}")
+        run_pipeline(
+            source=v["url"],
+            num_clips=clips,
+            anti_copyright=anti_copyright,
+            multicam=True,
+            top_banner=True,
+            watermark=watermark
+        )
+
+@app.command()
+def bundle(
+    output_dir: str = typer.Argument(..., help="Directory containing rendered clips"),
+    client: str = typer.Option("Valued_Client", "--client", help="Client name"),
+    handle: str = typer.Option("@ClipLocal", "--handle", help="Social handle")
+):
+    """Export turnkey Client Delivery Bundle with HTML executive report and ZIP package."""
+    import json
+    from src.cliplocal.core.models import CandidateClip
+    from src.cliplocal.export.delivery import create_client_delivery_bundle
+
+    in_d = Path(output_dir).resolve()
+    sidecars = list(in_d.glob("clip_*.json"))
+    if not sidecars:
+        console.print(f"[red]Error: No clip sidecar JSON files found in {in_d}[/]")
+        raise typer.Exit(code=1)
+
+    candidates: List[CandidateClip] = []
+    for sc in sidecars:
+        try:
+            data = json.loads(sc.read_text(encoding="utf-8"))
+            cand = CandidateClip.model_validate(data)
+            candidates.append(cand)
+        except Exception:
+            pass
+
+    out_bundle_root = Path("output/bundles")
+    zip_p = create_client_delivery_bundle(
+        candidates=candidates,
+        output_bundle_dir=out_bundle_root,
+        client_name=client,
+        brand_handle=handle,
+        source_name=in_d.name
+    )
+    console.print(f"[bold green]✔ Client Delivery Bundle exported to:[/] {zip_p}")
+
+@app.command()
+def schedule_csv(
+    output_dir: str = typer.Argument(..., help="Directory containing rendered clips"),
+    handle: str = typer.Option("@ClipLocal", "--handle", help="Social handle"),
+    out_file: str = typer.Option("output/schedule.csv", "--output", "-o", help="Target CSV file path")
+):
+    """Export 30-day bulk scheduling CSV for Meta Business Suite, Buffer, and Metricool."""
+    import json
+    from src.cliplocal.core.models import CandidateClip
+    from src.cliplocal.export.scheduler import export_bulk_schedule_csv
+
+    in_d = Path(output_dir).resolve()
+    sidecars = list(in_d.glob("clip_*.json"))
+    candidates = [CandidateClip.model_validate(json.loads(sc.read_text(encoding="utf-8"))) for sc in sidecars]
+
+    csv_path = export_bulk_schedule_csv(
+        candidates=candidates,
+        output_csv_path=Path(out_file),
+        brand_handle=handle
+    )
+    console.print(f"[bold green]✔ Bulk Scheduling CSV generated:[/] {csv_path}")
 
 @app.command()
 def watch(

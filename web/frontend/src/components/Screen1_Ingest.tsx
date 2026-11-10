@@ -25,6 +25,7 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
   const [bgMusic, setBgMusic] = useState(false)
   const [antiCopyright, setAntiCopyright] = useState(false)
   const [broll, setBroll] = useState(false)
+  const [watermark, setWatermark] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
 
@@ -61,7 +62,8 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
           include_sfx: includeSfx,
           background_music: bgMusic || antiCopyright,
           anti_copyright: antiCopyright,
-          broll: broll
+          broll: broll,
+          watermark: watermark.trim() || undefined
         })
       })
       const jobData = await jobRes.json()
@@ -226,6 +228,17 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
               <option value="faster_whisper">⚙️ Faster-Whisper (CPU / CUDA)</option>
               <option value="whisper_cpp">🔨 Whisper.cpp CLI (Metal)</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">Brand Handle / Watermark</label>
+            <input
+              type="text"
+              placeholder="@YourBrand or @ClientName"
+              value={watermark}
+              onChange={(e) => setWatermark(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200"
+            />
           </div>
 
           <div className="flex items-center justify-between pt-5">

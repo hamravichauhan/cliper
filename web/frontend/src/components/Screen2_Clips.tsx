@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Play, Copy, Download, Sliders, Check, Info, Share2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
+import { Play, Copy, Download, Sliders, Check, Info, Share2, Sparkles, ChevronDown, ChevronUp, Archive, Calendar } from 'lucide-react'
 
 interface Props {
   job: any
@@ -8,15 +8,25 @@ interface Props {
 }
 
 export const Screen2_Clips: React.FC<Props> = ({ job, onEditClip, onNewJob }) => {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+  const [copiedIndex, setCopiedIndex] = useState<string | null>(null)
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
 
   const candidates = job?.candidates || []
 
-  const handleCopy = (clip: any, index: number) => {
-    const text = `${clip.title}\n\n${clip.caption || clip.text}\n\n${(clip.hashtags || []).join(' ')}`
+  const handleCopyIG = (clip: any, index: number) => {
+    const hook = clip.title || 'Must Watch'
+    const tags = (clip.hashtags && clip.hashtags.length > 0) ? clip.hashtags.join(' ') : '#shorts #reels #viral #growth'
+    const text = `${hook.toUpperCase()} 📌\n\n• Key insight from this conversation.\n• Small consistent habits compound into massive results.\n\n💬 Comment 'GROWTH' for our breakdown!\n📌 Save this reel so you don't forget it.\n👉 Follow for daily high-impact clips.\n\n.\n.\n${tags}`
     navigator.clipboard.writeText(text)
-    setCopiedIndex(index)
+    setCopiedIndex(`ig_${index}`)
+    setTimeout(() => setCopiedIndex(null), 2000)
+  }
+
+  const handleCopyYT = (clip: any, index: number) => {
+    const title = `${clip.title || 'Viral Insight'} 🛑`
+    const text = `TITLE: ${title}\n\nDESCRIPTION:\n${clip.caption || clip.text}\n\n💬 What do you think about this? Comment below!\nSubscribe for daily clips.\n\n#shorts #viral #growth`
+    navigator.clipboard.writeText(text)
+    setCopiedIndex(`yt_${index}`)
     setTimeout(() => setCopiedIndex(null), 2000)
   }
 
@@ -37,12 +47,34 @@ export const Screen2_Clips: React.FC<Props> = ({ job, onEditClip, onNewJob }) =>
             Source: <span className="font-mono text-slate-300">{job?.source_url_or_path}</span>
           </p>
         </div>
-        <button
-          onClick={onNewJob}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors"
-        >
-          Process New Video
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={`/api/jobs/${job?.job_id}/export/bundle`}
+            download={`Client_Pack_${job?.job_id}.zip`}
+            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all"
+            title="Export complete client delivery folder with HTML report, videos, covers, and copy"
+          >
+            <Archive className="w-3.5 h-3.5" />
+            <span>Client Pack (.ZIP)</span>
+          </a>
+
+          <a
+            href={`/api/jobs/${job?.job_id}/export/schedule`}
+            download={`Schedule_${job?.job_id}.csv`}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-semibold rounded-xl border border-slate-700 transition-colors"
+            title="Download 30-day bulk scheduling CSV for Meta Business Suite & Buffer"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span>30-Day CSV</span>
+          </a>
+
+          <button
+            onClick={onNewJob}
+            className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl border border-slate-800 transition-colors"
+          >
+            New Video
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -169,31 +201,45 @@ export const Screen2_Clips: React.FC<Props> = ({ job, onEditClip, onNewJob }) =>
                 )}
 
                 {/* Action Buttons */}
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800">
-                  <button
-                    onClick={() => handleCopy(clip, idx)}
-                    className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
-                  >
-                    {copiedIndex === idx ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copiedIndex === idx ? 'Copied' : 'Copy'}</span>
-                  </button>
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleCopyIG(clip, idx)}
+                      className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-pink-950/40 hover:bg-pink-900/50 text-pink-300 text-[11px] font-semibold border border-pink-800/40 transition-colors"
+                      title="Copy Instagram Caption & 15 Tiered Hashtags"
+                    >
+                      {copiedIndex === `ig_${idx}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedIndex === `ig_${idx}` ? 'Copied IG' : 'Copy IG Copy'}</span>
+                    </button>
 
-                  <button
-                    onClick={() => onEditClip(clip)}
-                    className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 text-xs font-semibold border border-violet-500/30 transition-colors"
-                  >
-                    <Sliders className="w-3.5 h-3.5" />
-                    <span>Edit</span>
-                  </button>
+                    <button
+                      onClick={() => handleCopyYT(clip, idx)}
+                      className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-red-950/40 hover:bg-red-900/50 text-red-300 text-[11px] font-semibold border border-red-800/40 transition-colors"
+                      title="Copy YouTube Shorts Title & SEO Description"
+                    >
+                      {copiedIndex === `yt_${idx}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedIndex === `yt_${idx}` ? 'Copied YT' : 'Copy YT Copy'}</span>
+                    </button>
+                  </div>
 
-                  <a
-                    href={streamUrl}
-                    download={`clip_${clip.index || idx + 1}.mp4`}
-                    className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Save</span>
-                  </a>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => onEditClip(clip)}
+                      className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 text-violet-300 text-xs font-semibold border border-violet-500/30 transition-colors"
+                    >
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+
+                    <a
+                      href={streamUrl}
+                      download={`clip_${clip.index || idx + 1}.mp4`}
+                      className="flex items-center justify-center gap-1 py-2 px-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Save MP4</span>
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>

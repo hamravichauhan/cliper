@@ -4,6 +4,7 @@ import mimetypes
 from pathlib import Path
 from typing import Optional, List
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -15,6 +16,9 @@ from src.cliplocal.render.engine import render_candidate_clip
 from src.cliplocal.render.crop import build_crop_filter
 from src.cliplocal.render.ffmpeg import run_ffmpeg_render
 from src.cliplocal.captions.ass_generator import generate_ass_subtitles
+from src.cliplocal.export.delivery import create_client_delivery_bundle
+from src.cliplocal.export.scheduler import export_bulk_schedule_csv
+from src.cliplocal.harvest.monitor import detect_unprocessed_videos
 from src.cliplocal.config.settings import config
 
 app = FastAPI(title="ClipLocal API", version="1.0.0")
@@ -49,6 +53,7 @@ class SubmitJobRequest(BaseModel):
     background_music: bool = False
     anti_copyright: bool = False
     broll: bool = False
+    watermark: Optional[str] = None
 
 @app.post("/api/jobs")
 async def create_job(req: SubmitJobRequest):
@@ -98,6 +103,7 @@ class ReRenderRequest(BaseModel):
     background_music: bool = False
     anti_copyright: bool = False
     broll: bool = False
+    watermark: Optional[str] = None
 
 @app.post("/api/clips/re-render")
 async def re_render_clip(req: ReRenderRequest):
@@ -177,6 +183,74 @@ async def stream_media(path: str, request: Request):
         with open(file_path, "rb") as f:
             data = f.read()
         return Response(data, media_type=content_type)
+
+@app.get("/api/jobs/{job_id}/export/bundle")
+async def export_job_bundle(job_id: str, client_name: str = "Valued_Client", handle: str = "@ClipLocal"):
+    job = job_manager.get_job_state(job_id)
+    if not job or not job.candidates:
+        raise HTTPException(status_code=404, detail="Job or rendered candidates not found")
+
+    out_bundle_dir = Path("output/bundles")
+    out_bundle_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = create_client_delivery_bundle(
+        candidates=job.candidates,
+        output_bundle_dir=out_bundle_dir,
+        client_name=client_name,
+        brand_handle=handle,
+        source_name=Path(job.source_url_or_path).stem if not job.source_url_or_path.startswith("http") else "Web Video",
+        make_zip=True
+    )
+
+    return FileResponse(
+        path=str(zip_path),
+        filename=zip_path.name,
+        media_type="application/zip"
+    )
+
+@app.get("/api/jobs/{job_id}/export/schedule")
+async def export_job_schedule(job_id: str, handle: str = "@ClipLocal"):
+    job = job_manager.get_job_state(job_id)
+    if not job or not job.candidates:
+        raise HTTPException(status_code=404, detail="Job or rendered candidates not found")
+
+    csv_out = Path("output/schedules") / f"schedule_{job_id}.csv"
+    csv_file = export_bulk_schedule_csv(
+        candidates=job.candidates,
+        output_csv_path=csv_out,
+        brand_handle=handle
+    )
+
+    return FileResponse(
+        path=str(csv_file),
+        filename=csv_file.name,
+        media_type="text/csv"
+    )
+
+class HarvestRequest(BaseModel):
+    channel_url: str
+    clips: int = 5
+    max_videos: int = 2
+    anti_copyright: bool = True
+    watermark: Optional[str] = "@ClipLocal"
+
+@app.post("/api/harvest")
+async def harvest_channel(req: HarvestRequest):
+    new_vids = detect_unprocessed_videos([req.channel_url], max_per_channel=req.max_videos)
+    started_jobs = []
+    for vid in new_vids:
+        job = job_manager.submit_job(vid["url"], {
+            "source": vid["url"],
+            "clips": req.clips,
+            "style": "hormozi",
+            "mode": "auto",
+            "anti_copyright": req.anti_copyright,
+            "multicam": True,
+            "top_banner": True,
+            "watermark": req.watermark
+        })
+        started_jobs.append({"title": vid["title"], "url": vid["url"], "job_id": job.job_id})
+
+    return {"detected_count": len(new_vids), "started_jobs": started_jobs}
 
 # Mount frontend build directory if it exists
 frontend_dist = Path("web/frontend/dist")

@@ -43,6 +43,16 @@ ClipLocal is a **100% free, fully offline, single-user** video-to-shorts tool de
   - Evaluates candidate frames for Laplacian sharpness and expressive facial engagement, stamping high-contrast title banners onto 9:16 cover JPEGs ready for upload.
 - **⚡ Overnight Batch Folder Watcher**:
   - Dedicated background daemon (`cliplocal watch <folder>`) that monitors a directory, processes videos sequentially within memory bounds, and moves originals to `done/`.
+- **💼 Turnkey Client Delivery Pack (.ZIP)**:
+  - 1-click export of structured client folders containing vertical MP4s, 9:16 cover cards, formatted copy, and an executive dark-mode HTML delivery report for high-ticket agency retainers.
+- **📅 30-Day Bulk Scheduling CSV**:
+  - Automatically schedules 3 posts/day and exports a formatted CSV ready to import directly into Meta Business Suite, Buffer, or Metricool in under 5 minutes.
+- **📡 Channel Auto-Harvester**:
+  - Automatically monitors YouTube channels (`cliplocal harvest <url>`), tracks processed episodes in local cache, and clips new videos hands-free.
+- **🏷️ Social Handle & Brand Watermark**:
+  - Burns customizable translucent handle badges (e.g. `@ApexMindset`) into top or bottom safe areas to protect against content theft.
+- **✍️ Viral Copywriting Engine**:
+  - Drafts algorithm-optimized post copy for YouTube Shorts (high-CTR title, SEO description, search tags) and Instagram Reels (scroll-stopping hook, value bullet points, DM CTA, and 15 tiered hashtags).
 - **Dynamic Punch-Ins (Auto-Zoom)**:
   - Automatic 1.15x close-up punch-ins on opening hook sentences and intermittent cadence resets every ~7 seconds.
 - **Viral SFX & Background Music with Auto-Ducking**:
@@ -125,11 +135,17 @@ This automatically launches the FastAPI studio and opens your default browser at
 ClipLocal includes a full-featured CLI for terminal workflows:
 
 ```bash
-# Process a local video or YouTube URL into 6 ranked shorts with Anti-Copyright & Multi-Cam
-uv run cliplocal run /path/to/video.mp4 --clips 6 --style hormozi --anti-copyright --multicam --top-banner
+# Process a local video with Anti-Copyright, Multi-Cam, and Brand Watermark
+uv run cliplocal run /path/to/video.mp4 --clips 6 --style emerald --anti-copyright --multicam --watermark "@ApexMindset"
 
-# Run with Cyberpunk or Emerald Cash style and B-Roll cutaways
-uv run cliplocal run fixtures/test_podcast_sample.mp4 --style cyberpunk --broll
+# Channel Auto-Harvester: monitor YouTube channel and automatically clip new episodes
+uv run cliplocal harvest "https://www.youtube.com/@HubermanLab/videos" --clips 5 --watermark "@HubermanClips"
+
+# Export turnkey Client Delivery Bundle (structured folders, covers, copy, and HTML report)
+uv run cliplocal bundle output/test_podcast_sample --client "AcmeMedia" --handle "@AcmeMindset"
+
+# Export 30-Day bulk scheduling CSV for Meta Business Suite & Buffer
+uv run cliplocal schedule-csv output/test_podcast_sample --output output/schedule.csv --handle "@ApexMindset"
 
 # Overnight Batch Watcher: automatically process all videos dropped into a folder
 uv run cliplocal watch ./incoming_videos/ --output ./output/ --clips 5 --anti-copyright
@@ -150,6 +166,7 @@ uv run cliplocal benchmark fixtures/test_audio.wav
 | `--multicam` | `True` | Simulate 2-camera studio setup (wide vs tight snap-cuts on sentence boundaries) |
 | `--broll` | `False` | Insert visual B-roll cutaway overlays on topic keywords (dialogue preserved) |
 | `--top-banner` | `True` | Pin high-retention hook headline pill banner at top safe area |
+| `--watermark, -w` | `None` | Social handle or brand logo badge (e.g. `@ApexMindset`) |
 | `--backend, -b` | `mlx` | Whisper backend: `mlx`, `faster_whisper`, `whisper_cpp` |
 | `--no-llm` | `True` | Disable Ollama LLM enhancement and use pure heuristics |
 
@@ -177,13 +194,13 @@ scoring:
 
 ## Testing
 
-Run the automated test suite covering sentence segmentation, candidate generation, heuristic virality scoring, deduplication, ASS subtitles, crop smoothing, active speaker hysteresis, jump-cut trimming, anti-copyright transformative filters, B-roll overlays, and batch processing:
+Run the automated test suite covering sentence segmentation, candidate generation, heuristic virality scoring, deduplication, ASS subtitles, crop smoothing, active speaker hysteresis, jump-cut trimming, anti-copyright transformative filters, B-roll overlays, client delivery bundles, bulk scheduling CSVs, and channel harvesting:
 
 ```bash
 uv run pytest tests/
 ```
 
-All 39 unit and integration tests execute in under 12 seconds.
+All 46 unit and integration tests execute in under 12 seconds.
 
 ---
 
