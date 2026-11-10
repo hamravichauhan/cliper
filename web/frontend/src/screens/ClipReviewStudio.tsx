@@ -72,7 +72,7 @@ export const ClipReviewStudio: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Local inspector tab
-  const [inspectorTab, setInspectorTab] = useState<'details' | 'captions' | 'audio' | 'copy' | 'brand'>('details')
+  const [inspectorTab, setInspectorTab] = useState<'details' | 'captions' | 'audio' | 'pipeline' | 'copy' | 'brand'>('details')
   const [filterStatus, setFilterStatus] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [copiedField, setCopiedField] = useState<string | null>(null)
@@ -84,6 +84,31 @@ export const ClipReviewStudio: React.FC = () => {
   const [clipSongVolume, setClipSongVolume] = useState(70)
   const [clipCustomSong, setClipCustomSong] = useState<string | null>(null)
   const [isAudioReRendering, setIsAudioReRendering] = useState(false)
+
+  // AI Pipeline & Reframing State
+  const [reframeMode, setReframeMode] = useState<'auto' | 'center'>('auto')
+  const [autoZoom, setAutoZoom] = useState(true)
+  const [multiCam, setMultiCam] = useState(true)
+  const [includeEmojis, setIncludeEmojis] = useState(true)
+  const [includeSfx, setIncludeSfx] = useState(true)
+  const [antiCopyright, setAntiCopyright] = useState(false)
+  const [topBanner, setTopBanner] = useState(true)
+  const [broll, setBroll] = useState(false)
+  const [isPipelineReRendering, setIsPipelineReRendering] = useState(false)
+
+  // Autocut Word Deletion (Strike-through filler/pause spans)
+  const [isCutMode, setIsCutMode] = useState(false)
+  const [deletedWordIndices, setDeletedWordIndices] = useState<Set<number>>(new Set())
+
+  const toggleWordCut = (idx: number) => {
+    const next = new Set(deletedWordIndices)
+    if (next.has(idx)) {
+      next.delete(idx)
+    } else {
+      next.add(idx)
+    }
+    setDeletedWordIndices(next)
+  }
 
   // Sync real video player with isPlaying
   useEffect(() => {
@@ -465,13 +490,46 @@ export const ClipReviewStudio: React.FC = () => {
             {/* Interactive Transcript & Trim Section */}
             <div className="w-full max-w-[680px] bg-bg-surface border border-border rounded-card p-4 space-y-3">
               <div className="flex justify-between items-center text-xs pb-1 border-b border-border/80">
-                <span className="font-semibold text-text-primary flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-accent" />
-                  <span>Interactive Transcript</span>
-                  <span className="text-[10px] text-text-muted">(Click word to seek)</span>
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-text-primary flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-accent" />
+                    <span>Interactive Transcript</span>
+                  </span>
+
+                  {/* Mode Switch: Seek vs Autocut Word Trim */}
+                  <div className="flex items-center bg-[#18181B] border border-border rounded p-0.5 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setIsCutMode(false)}
+                      className={`px-2 py-0.5 rounded transition-all ${
+                        !isCutMode ? 'bg-accent text-[#09090B] font-bold' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                    >
+                      Seek Mode
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCutMode(true)}
+                      className={`px-2 py-0.5 rounded transition-all flex items-center gap-1 ${
+                        isCutMode ? 'bg-danger text-white font-bold' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                    >
+                      <Scissors className="w-2.5 h-2.5" />
+                      Cut Spans {deletedWordIndices.size > 0 && `(${deletedWordIndices.size})`}
+                    </button>
+                  </div>
+                </div>
 
                 <div className="flex items-center gap-2">
+                  {deletedWordIndices.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setDeletedWordIndices(new Set())}
+                      className="text-[10px] text-danger hover:underline mr-1"
+                    >
+                      Reset Cuts
+                    </button>
+                  )}
                   <button
                     onClick={undoTrim}
                     disabled={historyIndex < 0}
@@ -495,19 +553,32 @@ export const ClipReviewStudio: React.FC = () => {
               <div className="flex flex-wrap gap-1.5 text-xs leading-relaxed max-h-36 overflow-y-auto p-1 font-sans">
                 {clip.words.map((w, idx) => {
                   const isActive = currentTime >= w.start && currentTime <= w.end
+                  const isCut = deletedWordIndices.has(idx)
                   return (
                     <button
                       key={w.id}
                       onClick={() => {
-                        setCurrentTime(w.start)
-                        setIsPlaying(true)
+                        if (isCutMode) {
+                          toggleWordCut(idx)
+                        } else {
+                          setCurrentTime(w.start)
+                          setIsPlaying(true)
+                        }
                       }}
                       className={`px-1.5 py-0.5 rounded transition-all select-none text-left ${
-                        isActive
+                        isCut
+                          ? 'bg-rose-950/80 text-rose-400 line-through border border-rose-800/60'
+                          : isActive
                           ? 'bg-accent text-[#09090B] font-bold shadow-sm scale-105'
                           : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
                       }`}
-                      title={`Seek to ${w.start.toFixed(1)}s`}
+                      title={
+                        isCutMode
+                          ? isCut
+                            ? 'Click to restore word'
+                            : 'Click to cut word from clip'
+                          : `Seek to ${w.start.toFixed(1)}s`
+                      }
                     >
                       {w.word}
                     </button>
@@ -561,7 +632,8 @@ export const ClipReviewStudio: React.FC = () => {
               tabs={[
                 { id: 'details', label: 'Details' },
                 { id: 'captions', label: 'Captions' },
-                { id: 'audio', label: 'Audio & Song' },
+                { id: 'audio', label: 'Audio' },
+                { id: 'pipeline', label: 'AI Pipeline' },
                 { id: 'copy', label: 'Copy' },
                 { id: 'brand', label: 'Brand' }
               ]}
@@ -868,6 +940,119 @@ export const ClipReviewStudio: React.FC = () => {
                   }}
                 >
                   {isAudioReRendering ? 'Re-Rendering Audio with VideoToolbox...' : 'Apply & Re-Render Audio'}
+                </Button>
+              </div>
+            )}
+
+            {/* TAB: AI PIPELINE & FRAMING */}
+            {inspectorTab === 'pipeline' && (
+              <div className="space-y-4">
+                {/* 9:16 Reframe Mode */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-text-secondary">
+                    9:16 Video Reframe Mode
+                  </label>
+                  <select
+                    value={reframeMode}
+                    onChange={(e) => setReframeMode(e.target.value as any)}
+                    className="w-full bg-[#18181B] border border-border text-xs rounded-control px-3 py-2 text-text-primary outline-none focus:border-accent"
+                  >
+                    <option value="auto">🤖 Auto-Detect (Face-Tracking + EMA)</option>
+                    <option value="center">🎯 Center Crop (Static 9:16)</option>
+                  </select>
+                </div>
+
+                {/* AI Feature Toggles */}
+                <div className="space-y-3 pt-2 border-t border-border/80">
+                  <Toggle
+                    label="Multi-Cam Active Speaker Auto-Cut"
+                    description="Dynamically switch camera framing to active speaker."
+                    checked={multiCam}
+                    onChange={setMultiCam}
+                  />
+
+                  <Toggle
+                    label="Dynamic Punch-In Auto-Zoom"
+                    description="1.15x punch-in zooms on high-energy sentence hooks."
+                    checked={autoZoom}
+                    onChange={setAutoZoom}
+                  />
+
+                  <Toggle
+                    label="Animated Keyword SFX & Pops"
+                    description="Trigger whoosh SFX and animated emphasis on power words."
+                    checked={includeSfx}
+                    onChange={setIncludeSfx}
+                  />
+
+                  <Toggle
+                    label="Anti-Copyright Transform Engine"
+                    description="1.025x subtle tempo + pitch shift to prevent content ID flags."
+                    checked={antiCopyright}
+                    onChange={setAntiCopyright}
+                  />
+
+                  <Toggle
+                    label="Top Hook Headline Banner"
+                    description="Burn clean context headline at top safe area."
+                    checked={topBanner}
+                    onChange={setTopBanner}
+                  />
+
+                  <Toggle
+                    label="B-Roll Narrative Cutaways"
+                    description="Insert visual concept cutaways during setups."
+                    checked={broll}
+                    onChange={setBroll}
+                  />
+                </div>
+
+                {/* Autocut Status */}
+                {deletedWordIndices.size > 0 && (
+                  <div className="p-3 bg-danger/10 border border-danger/30 rounded-control flex items-center justify-between text-xs">
+                    <span className="text-danger font-medium">
+                      ✂️ {deletedWordIndices.size} word spans will be cut out
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDeletedWordIndices(new Set())}
+                      className="text-[11px] text-text-muted hover:text-white underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full mt-2"
+                  disabled={isPipelineReRendering}
+                  icon={<Sparkles className="w-3.5 h-3.5" />}
+                  onClick={async () => {
+                    setIsPipelineReRendering(true)
+                    try {
+                      await reRenderCurrentClip(clip.id, {
+                        title: clip.title,
+                        caption_style: clip.captionStyle,
+                        reframe_mode: reframeMode,
+                        auto_zoom: autoZoom,
+                        multicam: multiCam,
+                        top_banner: topBanner,
+                        include_emojis: includeEmojis,
+                        include_sfx: includeSfx,
+                        anti_copyright: antiCopyright,
+                        broll: broll,
+                        deleted_words: Array.from(deletedWordIndices)
+                      })
+                    } finally {
+                      setIsPipelineReRendering(false)
+                    }
+                  }}
+                >
+                  {isPipelineReRendering
+                    ? 'Re-Rendering with VideoToolbox...'
+                    : 'Apply Pipeline & Re-Render'}
                 </Button>
               </div>
             )}
