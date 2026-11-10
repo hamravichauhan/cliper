@@ -11,6 +11,7 @@ interface Props {
 export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpdated }) => {
   const [start, setStart] = useState<number>(clip.start)
   const [end, setEnd] = useState<number>(clip.end)
+  const [title, setTitle] = useState<string>(clip.title || '')
   const [captionStyle, setCaptionStyle] = useState<string>(clip.caption_style || 'hormozi')
   const [reframeMode, setReframeMode] = useState<string>(clip.reframe_mode || 'center')
   const [autoZoom, setAutoZoom] = useState<boolean>(clip.auto_zoom ?? true)
@@ -50,6 +51,7 @@ export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpd
           clip_id: clip.clip_id,
           start: Number(start),
           end: Number(end),
+          title: title,
           deleted_words: Array.from(deletedIndices),
           caption_style: captionStyle,
           reframe_mode: reframeMode,
@@ -186,6 +188,26 @@ export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpd
                 )
               })}
             </div>
+          </div>
+
+          {/* Top Context Headline */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Top Context Headline
+              </label>
+              <span className="text-[10px] text-violet-400 font-mono">Burned at Top Safe Area</span>
+            </div>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Why most people fail at business..."
+              className="w-full bg-slate-950 border border-slate-700 focus:border-violet-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 transition-colors"
+            />
+            <p className="text-[11px] text-slate-500">
+              Clean typography written at the top of the video to give viewers instant context.
+            </p>
           </div>
 
           {/* Styling & Framing */}

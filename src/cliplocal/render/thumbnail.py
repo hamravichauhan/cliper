@@ -106,26 +106,35 @@ def extract_viral_thumbnails(
         # Resize to standard 1080x1920
         v_thumb = cv2.resize(cropped, (1080, 1920), interpolation=cv2.INTER_AREA)
 
-        # Draw sleek viral title banner at top
-        banner_y1, banner_y2 = 180, 310
-        # Translucent dark charcoal pill banner
-        overlay = v_thumb.copy()
-        cv2.rectangle(overlay, (80, banner_y1), (1000, banner_y2), (20, 20, 25), -1)
-        cv2.addWeighted(overlay, 0.85, v_thumb, 0.15, 0, v_thumb)
-        # Gold accent border
-        cv2.rectangle(v_thumb, (80, banner_y1), (1000, banner_y2), (0, 215, 255), 4)
-
-        # Draw title text centered
+        # Draw sleek viral context headline at top (clean typography, no loud box or yellow borders)
         font = cv2.FONT_HERSHEY_DUPLEX
-        font_scale = 1.3
+        font_scale = 1.15
         thickness = 3
-        text_size = cv2.getTextSize(clean_title, font, font_scale, thickness)[0]
-        text_x = max(90, (1080 - text_size[0]) // 2)
-        text_y = banner_y1 + ((banner_y2 - banner_y1) + text_size[1]) // 2
 
-        # Shadow + Text
-        cv2.putText(v_thumb, clean_title, (text_x + 2, text_y + 2), font, font_scale, (0, 0, 0), thickness + 2, cv2.LINE_AA)
-        cv2.putText(v_thumb, clean_title, (text_x, text_y), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+        # Soft subtle dark vignette/gradient at top for crisp text readability
+        overlay = v_thumb.copy()
+        cv2.rectangle(overlay, (0, 0), (1080, 360), (10, 10, 15), -1)
+        cv2.addWeighted(overlay, 0.40, v_thumb, 0.60, 0, v_thumb)
+
+        # Word wrap context headline across 1 or 2 lines
+        words = clean_title.split()
+        if len(clean_title) > 24 and len(words) > 3:
+            mid = (len(words) + 1) // 2
+            lines = [" ".join(words[:mid]), " ".join(words[mid:])]
+        else:
+            lines = [clean_title]
+
+        start_y = 210 if len(lines) == 1 else 180
+        line_height = 65
+
+        for line_idx, line_text in enumerate(lines):
+            text_size = cv2.getTextSize(line_text, font, font_scale, thickness)[0]
+            text_x = max(40, (1080 - text_size[0]) // 2)
+            text_y = start_y + (line_idx * line_height)
+
+            # Drop shadow (black) + crisp white text
+            cv2.putText(v_thumb, line_text, (text_x + 3, text_y + 3), font, font_scale, (0, 0, 0), thickness + 3, cv2.LINE_AA)
+            cv2.putText(v_thumb, line_text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
         out_thumb_path = out_d / f"clip_{clip_index:02d}_thumb_{idx + 1}.jpg"
         cv2.imwrite(str(out_thumb_path), v_thumb, [cv2.IMWRITE_JPEG_QUALITY, 92])

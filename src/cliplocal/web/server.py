@@ -109,6 +109,7 @@ class ReRenderRequest(BaseModel):
     clip_id: str
     start: float
     end: float
+    title: Optional[str] = None
     deleted_words: List[int] = [] # Autocut-style: indices of words to remove
     caption_style: str = "hormozi"
     reframe_mode: str = "center"
@@ -132,10 +133,12 @@ async def re_render_clip(req: ReRenderRequest):
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
 
-    # Update candidate boundaries
+    # Update candidate boundaries and context headline
     candidate.start = req.start
     candidate.end = req.end
     candidate.duration = req.end - req.start
+    if req.title is not None:
+        candidate.title = req.title
     candidate.caption_style = CaptionStyleName(req.caption_style) if req.caption_style in [e.value for e in CaptionStyleName] else CaptionStyleName.HORMOZI
     candidate.reframe_mode = ReframeMode(req.reframe_mode) if req.reframe_mode in [e.value for e in ReframeMode] else ReframeMode.CENTER
 

@@ -198,6 +198,10 @@ class JobManager:
         top_candidates = await asyncio.to_thread(deduplicate_candidates, scored, top_n=clip_count)
         log(f"Deduplicated and selected top {len(top_candidates)} viral candidates")
 
+        # Automatically extract and assign meaningful topic context headlines to every clip
+        from src.cliplocal.context.extractor import assign_clip_contexts
+        top_candidates = assign_clip_contexts(top_candidates)
+
         # 4.5 Optional Local LLM Re-Ranking
         if options.get("use_llm"):
             job.stage = "4.5 Ollama Local LLM Re-Ranking & Titles"

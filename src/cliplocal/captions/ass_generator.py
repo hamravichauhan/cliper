@@ -70,20 +70,22 @@ def generate_ass_subtitles(
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
         f"Style: Default,{style.font_name},{style.font_size},{primary_ass},{highlight_ass},{outline_ass},&H80000000,"
         f"{'-1' if style.bold else '0'},0,0,0,100,100,0,0,1,{style.outline_width},{style.shadow_offset},2,60,60,{style.margin_v},1",
-        f"Style: TopHook,{style.font_name},38,&H00FFFFFF,&H00000000,&H00000000,&H85181820,-1,0,0,0,100,100,0,0,3,14,0,8,60,60,180,1",
+        f"Style: TopContext,{style.font_name},42,&H00FFFFFF,&H00000000,&H000B0F17,&H80000000,-1,0,0,0,100,100,0,0,1,3.5,2.0,8,60,60,180,1",
         "",
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
     ]
 
-    # Top Hook Banner Event
+    # Top Context Headline (Clean typographic context, no harsh boxes)
     if top_hook_headline and top_hook_headline.strip():
-        banner_clean = escape_ass(top_hook_headline.strip())
+        from src.cliplocal.context.extractor import format_context_for_ass
+        formatted = format_context_for_ass(top_hook_headline.strip())
+        banner_clean = escape_ass(formatted)
         if style.uppercase:
             banner_clean = banner_clean.upper()
-        banner_end = clip_duration if top_hook_persistent else min(4.5, clip_duration)
-        fad_tag = "{\\fad(150,300)}" if not top_hook_persistent else ""
-        ass_lines.append(f"Dialogue: 1,0:00:00.00,{ass_time(banner_end)},TopHook,,0,0,0,,{fad_tag}{banner_clean}")
+        banner_end = clip_duration if top_hook_persistent else min(5.0, clip_duration)
+        fad_tag = "{\\fad(200,300)}" if not top_hook_persistent else ""
+        ass_lines.append(f"Dialogue: 1,0:00:00.00,{ass_time(banner_end)},TopContext,,0,0,0,,{fad_tag}{banner_clean}")
 
     # Filter words inside clip
     valid_words = [w for w in words if (w.end - time_offset) > 0.0]

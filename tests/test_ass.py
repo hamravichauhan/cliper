@@ -57,7 +57,6 @@ def test_top_hook_banner_and_new_styles(tmp_path):
     )
 
     content = out_file.read_text(encoding="utf-8")
-    assert "Style: TopHook" in content
+    assert "Style: TopContext" in content
     assert "WHY 99% FAIL 🔥" in content
-    assert "TopHook" in content
-    assert "\\fad(150,300)" in content
+    assert "\\fad(" in content

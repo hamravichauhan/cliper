@@ -87,7 +87,7 @@ class CandidateClip(BaseModel):
     words: List[Word] = Field(default_factory=list)
     sentences: List[Sentence] = Field(default_factory=list)
     score: ScoreBreakdown
-    title: str = "Engaging Moment"
+    title: str = ""
     caption: str = ""
     hashtags: List[str] = Field(default_factory=list)
     reframe_mode: ReframeMode = ReframeMode.AUTO

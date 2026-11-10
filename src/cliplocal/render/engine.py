@@ -77,7 +77,13 @@ def render_candidate_clip(
 
     # 1. Generate ASS subtitles for this clip in /tmp
     ass_path = Path("/tmp") / f"cliplocal_subs_{candidate.clip_id}_{candidate.index}.ass"
-    top_headline = (candidate.title or candidate.text[:40]) if top_banner else None
+    
+    # Extract dynamic, meaningful context headline from spoken words (never generic 'Engaging Moment')
+    from src.cliplocal.context.extractor import extract_clip_context
+    if not candidate.title or candidate.title.strip().lower() in ("engaging moment", "untitled", "clip"):
+        candidate.title = extract_clip_context(candidate.text, candidate.sentences)
+
+    top_headline = candidate.title if top_banner else None
 
     generate_ass_subtitles(
         words=candidate.words,

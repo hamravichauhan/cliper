@@ -84,6 +84,11 @@ def run_pipeline(
     # Stage 6: Deduplication & Ranking
     timer.start_stage("6. Deduplication & Ranking")
     top_candidates = deduplicate_candidates(scored, top_n=num_clips)
+
+    # Automatically extract and assign meaningful topic context headlines to every clip
+    from src.cliplocal.context.extractor import assign_clip_contexts
+    top_candidates = assign_clip_contexts(top_candidates)
+
     if use_llm:
         console.print("[cyan]Running local Ollama LLM re-ranking & title generation...[/]")
         top_candidates = rerank_candidates_with_llm(top_candidates)
