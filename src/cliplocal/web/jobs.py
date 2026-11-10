@@ -211,7 +211,7 @@ class JobManager:
         if job_id in self.cancelled_jobs:
             return
 
-        # 5. Render Clips
+        # 5. Render Clips in Parallel
         t0 = time.perf_counter()
         job.status = JobStatus.RENDERING
         job.stage = "5. Rendering 1080x1920 clips with burned-in ASS captions"
@@ -223,15 +223,18 @@ class JobManager:
         caption_style = CaptionStyleName(style_str) if style_str in [e.value for e in CaptionStyleName] else CaptionStyleName.HORMOZI
         reframe_mode = ReframeMode(mode_str) if mode_str in [e.value for e in ReframeMode] else ReframeMode.AUTO
 
-        rendered_list = []
-        for i, cand in enumerate(top_candidates):
-            if job_id in self.cancelled_jobs:
-                return
+        for cand in top_candidates:
             cand.caption_style = caption_style
-            log(f"Rendering clip #{cand.index:02d} ({cand.duration:.1f}s, Score: {cand.score.total_score:.1f})...")
-            
-            await asyncio.to_thread(
-                render_candidate_clip,
+
+        rendered_list = []
+        import concurrent.futures
+        max_parallel = min(3, max(1, len(top_candidates)))
+        log(f"Launching parallel rendering engine with {max_parallel} concurrent hardware workers...")
+
+        def _render_worker(cand: CandidateClip):
+            if job_id in self.cancelled_jobs:
+                return None
+            render_candidate_clip(
                 video_path=video_path,
                 candidate=cand,
                 output_dir=output_dir,
@@ -248,10 +251,23 @@ class JobManager:
                 extract_thumbnails=True,
                 watermark=options.get("watermark")
             )
-            rendered_list.append(cand)
-            step_progress = 70.0 + ((i + 1) / len(top_candidates)) * 28.0
-            job.progress = round(step_progress, 1)
-            self._persist_job(job, options)
+            return cand
+
+        loop = asyncio.get_running_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel) as pool:
+            futures = [loop.run_in_executor(pool, _render_worker, c) for c in top_candidates]
+            for fut in asyncio.as_completed(futures):
+                if job_id in self.cancelled_jobs:
+                    return
+                res = await fut
+                if res:
+                    rendered_list.append(res)
+                    log(f"Rendered clip #{res.index:02d} ({res.duration:.1f}s, Score: {res.score.total_score:.1f})")
+                    step_progress = 70.0 + (len(rendered_list) / len(top_candidates)) * 28.0
+                    job.progress = round(step_progress, 1)
+                    self._persist_job(job, options)
+
+        rendered_list.sort(key=lambda c: c.index)
 
         timing_report["Rendering"] = round(time.perf_counter() - t0, 3)
         job.candidates = rendered_list

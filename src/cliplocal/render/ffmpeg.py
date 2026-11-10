@@ -48,6 +48,29 @@ def run_ffmpeg_render(
             "-map", "[v_out]",
             "-map", "[a_out]",
             "-c:v", selected_encoder,
+        ])
+
+        # Hardware-specific fast + high quality tuning (preserving crisp 1080p quality at maximum FPS)
+        if selected_encoder == "h264_videotoolbox":
+            cmd.extend([
+                "-b:v", "6500k",
+                "-maxrate", "9000k",
+                "-bufsize", "12000k",
+                "-realtime", "0"
+            ])
+        elif selected_encoder == "h264_nvenc":
+            cmd.extend([
+                "-preset", "p5",
+                "-cq", "20",
+                "-b:v", "6500k"
+            ])
+        elif selected_encoder == "libx264":
+            cmd.extend([
+                "-preset", "veryfast",
+                "-crf", "20"
+            ])
+
+        cmd.extend([
             "-pix_fmt", "yuv420p",
             "-c:a", "aac",
             "-b:a", "192k",

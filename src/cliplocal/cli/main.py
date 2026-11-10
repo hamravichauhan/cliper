@@ -98,27 +98,41 @@ def run_pipeline(
     target_dir.mkdir(parents=True, exist_ok=True)
 
     rendered_files: List[Path] = []
+    import concurrent.futures
+    max_workers = min(3, max(1, len(top_candidates)))
+    console.print(f"[bold cyan]⚡ Launching parallel hardware rendering ({max_workers} concurrent workers)...[/]")
+
     for cand in top_candidates:
         cand.caption_style = style
-        out_file = render_candidate_clip(
-            video_path=video_path,
-            candidate=cand,
-            output_dir=target_dir,
-            metadata=metadata,
-            reframe_mode=reframe_mode,
-            auto_zoom=auto_zoom,
-            multicam=multicam,
-            top_banner=top_banner,
-            include_emojis=include_emojis,
-            include_sfx=include_sfx,
-            background_music=background_music,
-            anti_copyright=anti_copyright,
-            broll=broll,
-            extract_thumbnails=True,
-            watermark=watermark
-        )
-        rendered_files.append(out_file)
-        console.print(f"  [green]✔ Rendered:[/] {out_file.name}")
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_cand = {
+            executor.submit(
+                render_candidate_clip,
+                video_path=video_path,
+                candidate=cand,
+                output_dir=target_dir,
+                metadata=metadata,
+                reframe_mode=reframe_mode,
+                auto_zoom=auto_zoom,
+                multicam=multicam,
+                top_banner=top_banner,
+                include_emojis=include_emojis,
+                include_sfx=include_sfx,
+                background_music=background_music,
+                anti_copyright=anti_copyright,
+                broll=broll,
+                extract_thumbnails=True,
+                watermark=watermark
+            ): cand for cand in top_candidates
+        }
+
+        for future in concurrent.futures.as_completed(future_to_cand):
+            out_file = future.result()
+            rendered_files.append(out_file)
+            console.print(f"  [green]✔ Rendered:[/] {out_file.name}")
+
+    rendered_files.sort(key=lambda p: p.name)
 
     timer.end_stage()
     timer.print_report()
