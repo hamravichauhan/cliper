@@ -381,50 +381,6 @@ export const ClipReviewStudio: React.FC = () => {
                   }`}
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
-
-              {/* Top Context Headline Overlay (NO UGLY BOX!) */}
-              <div className="absolute top-12 left-4 right-4 text-center pointer-events-none">
-                <span
-                  className="inline-block text-white font-extrabold text-sm uppercase tracking-wide px-3 py-1 text-center"
-                  style={{
-                    textShadow: '0 2px 8px rgba(0,0,0,0.9), 0 0 4px #000',
-                    WebkitTextStroke: '1px #000'
-                  }}
-                >
-                  {clip.title}
-                </span>
-              </div>
-
-              {/* Active Spoken Caption Karaoke Highlight */}
-              <div className="absolute bottom-16 left-4 right-4 text-center pointer-events-none px-2">
-                <div className="inline-flex flex-wrap justify-center items-center gap-1.5">
-                  {clip.words.slice(0, 10).map((w, idx) => {
-                    const isActive = idx === (activeWordIndex >= 0 ? activeWordIndex % 10 : 0)
-                    return (
-                      <span
-                        key={w.id}
-                        className={`text-base font-extrabold uppercase tracking-tight transition-all duration-150 ${
-                          isActive
-                            ? 'text-[#FACC15] scale-110 drop-shadow-[0_2px_10px_rgba(250,204,21,0.8)]'
-                            : 'text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]'
-                        }`}
-                        style={{ WebkitTextStroke: '1.2px #000' }}
-                      >
-                        {w.word}
-                      </span>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Watermark Handle Preview */}
-              {clip.watermarkHandle && (
-                <div className="absolute bottom-4 right-4 text-[10px] font-mono text-white/80 bg-black/40 px-2 py-0.5 rounded backdrop-blur-sm pointer-events-none">
-                  {clip.watermarkHandle}
-                </div>
-              )}
-
               {/* Big Center Play/Pause button on hover */}
               <button
                 onClick={() => setIsPlaying(!isPlaying)}
