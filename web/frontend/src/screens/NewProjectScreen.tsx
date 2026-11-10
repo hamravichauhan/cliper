@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -15,17 +15,34 @@ import {
   Sparkles,
   ArrowRight,
   ShieldCheck,
-  Zap
+  Zap,
+  Search,
+  Flame,
+  Check,
+  RefreshCw,
+  ExternalLink,
+  Clock,
+  Play
 } from 'lucide-react'
 
 export const NewProjectScreen: React.FC = () => {
   const { setScreen, brandKits, addToast, submitNewJob } = useStore()
 
   // Step 1: Source
-  const [sourceTab, setSourceTab] = useState<'upload' | 'youtube' | 'channel'>('upload')
-  const [uploadedFile, setUploadedFile] = useState<string | null>('hormozi_masterclass_4k.mp4')
+  const [sourceTab, setSourceTab] = useState<'upload' | 'youtube' | 'channel'>('channel')
+  const [uploadedFile, setUploadedFile] = useState<string | null>('naval_rogan_interview.mp4')
   const [youtubeUrl, setYoutubeUrl] = useState('')
-  const [rightsConfirmed, setRightsConfirmed] = useState(false)
+  const [selectedVideo, setSelectedVideo] = useState<any | null>(null)
+  const [rightsConfirmed, setRightsConfirmed] = useState(true)
+
+  // Harvester & Discovery state
+  const [searchQuery, setSearchQuery] = useState('naval ravikant')
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [channelUrl, setChannelUrl] = useState('https://www.youtube.com/@hubermanlab')
+  const [maxHarvest, setMaxHarvest] = useState(2)
+  const [isHarvesting, setIsHarvesting] = useState(false)
+  const [harvestedVideos, setHarvestedVideos] = useState<any[]>([])
 
   // Step 2: Settings
   const [clipCount, setClipCount] = useState(5)
@@ -37,6 +54,70 @@ export const NewProjectScreen: React.FC = () => {
   const [sfx, setSfx] = useState(true)
   const [music, setMusic] = useState(false)
 
+  // Initial discover search on mount
+  useEffect(() => {
+    handleSearch('naval ravikant')
+  }, [])
+
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) return
+    setIsSearching(true)
+    try {
+      const res = await fetch(`/api/discover/search?query=${encodeURIComponent(query)}&limit=6`)
+      if (res.ok) {
+        const data = await res.json()
+        setSearchResults(data)
+      }
+    } catch (err) {
+      console.error('Search error:', err)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const handleHarvestChannel = async () => {
+    if (!channelUrl.trim()) return
+    setIsHarvesting(true)
+    try {
+      const res = await fetch('/api/harvest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel_url: channelUrl,
+          clips: clipCount,
+          max_videos: maxHarvest,
+          anti_copyright: true,
+          watermark: brandKits[0]?.handle || '@ClipLocal'
+        })
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setHarvestedVideos(data.started_jobs || [])
+        addToast({
+          title: 'Channel Harvest Started',
+          description: `Discovered and queued ${data.detected_count || data.started_jobs?.length || 1} new uploads!`,
+          type: 'success'
+        })
+      }
+    } catch (err) {
+      console.error('Harvest error:', err)
+      addToast({ title: 'Harvest Failed', description: 'Could not connect to channel stream.', type: 'danger' })
+    } finally {
+      setIsHarvesting(false)
+    }
+  }
+
+  const handleSelectVideo = (video: any) => {
+    setSelectedVideo(video)
+    setYoutubeUrl(video.url)
+    addToast({
+      title: 'Video Selected for Clipping',
+      description: video.title,
+      type: 'info'
+    })
+  }
+
   const handleStartProcessing = async () => {
     if (!rightsConfirmed) {
       addToast({
@@ -47,7 +128,11 @@ export const NewProjectScreen: React.FC = () => {
       return
     }
 
-    const source = sourceTab === 'upload' ? (uploadedFile || 'sample.mp4') : (youtubeUrl || 'https://youtu.be/sample')
+    const source =
+      sourceTab === 'upload'
+        ? (uploadedFile || 'sample.mp4')
+        : (youtubeUrl || selectedVideo?.url || 'https://www.youtube.com/watch?v=3qHkcs3kG44')
+
     await submitNewJob({
       source,
       clips: clipCount,
@@ -70,14 +155,14 @@ export const NewProjectScreen: React.FC = () => {
   }
 
   return (
-    <div className="max-w-[840px] mx-auto py-8 px-6 space-y-8">
+    <div className="max-w-[960px] mx-auto py-8 px-6 space-y-8">
       {/* Page Title */}
       <div className="border-b border-border pb-4 space-y-1">
         <h2 className="text-xl font-bold tracking-tight text-text-primary">
           Create New Clipping Project
         </h2>
         <p className="text-xs text-text-secondary">
-          Configure video source and AI pipeline settings. Everything is processed locally.
+          Configure video source and AI pipeline settings. Everything is processed locally with Apple Silicon acceleration.
         </p>
       </div>
 
@@ -97,14 +182,226 @@ export const NewProjectScreen: React.FC = () => {
 
           <Tabs
             tabs={[
-              { id: 'upload', label: 'Local File (.mp4, .mov)', icon: <UploadCloud className="w-3.5 h-3.5" /> },
+              { id: 'channel', label: 'Channel Harvest & Discover', icon: <Radio className="w-3.5 h-3.5 text-accent" /> },
               { id: 'youtube', label: 'YouTube URL', icon: <Youtube className="w-3.5 h-3.5" /> },
-              { id: 'channel', label: 'Channel Harvest', icon: <Radio className="w-3.5 h-3.5" /> }
+              { id: 'upload', label: 'Local File (.mp4, .mov)', icon: <UploadCloud className="w-3.5 h-3.5" /> }
             ]}
             activeTab={sourceTab}
             onChange={(id) => setSourceTab(id as any)}
           />
 
+          {/* TAB: CHANNEL HARVEST & DISCOVER */}
+          {sourceTab === 'channel' && (
+            <div className="space-y-5 pt-1">
+              {/* Harvester Search Bar */}
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type="text"
+                      placeholder="Search any creator, channel or podcast (e.g. 'naval ravikant', 'huberman', 'alex hormozi')..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchQuery)}
+                      className="w-full bg-[#18181B] border border-border focus:border-accent text-xs rounded-control pl-9 pr-3 py-2 text-text-primary placeholder:text-text-muted outline-none transition-colors"
+                    />
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    isLoading={isSearching}
+                    onClick={() => handleSearch(searchQuery)}
+                  >
+                    Search
+                  </Button>
+                </div>
+
+                {/* Quick Niche Goldmines */}
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="text-[10px] uppercase font-semibold text-text-muted mr-1">
+                    Proven Goldmines:
+                  </span>
+                  {[
+                    'Naval Ravikant',
+                    'Alex Hormozi',
+                    'Huberman Lab',
+                    'David Goggins',
+                    'Y Combinator',
+                    'Joe Rogan'
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      onClick={() => {
+                        setSearchQuery(chip)
+                        handleSearch(chip)
+                      }}
+                      className="px-2.5 py-1 rounded-control bg-[#18181B] hover:bg-[#222226] text-text-secondary hover:text-text-primary text-[11px] border border-border transition-colors select-none"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Channel Auto-Harvest Section */}
+              <div className="bg-[#141416] border border-border rounded-control p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Radio className="w-3.5 h-3.5 text-accent animate-pulse" />
+                    <span className="text-xs font-semibold text-text-primary">
+                      Channel Upload Auto-Harvester
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-text-muted">Auto-Detects New Episodes</span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={channelUrl}
+                    onChange={(e) => setChannelUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/@channelhandle"
+                    className="flex-1 bg-[#18181B] border border-border focus:border-accent text-xs rounded-control px-3 py-2 text-text-primary placeholder:text-text-muted outline-none font-mono"
+                  />
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={maxHarvest}
+                      onChange={(e) => setMaxHarvest(Number(e.target.value))}
+                      className="bg-[#18181B] border border-border text-xs rounded-control px-2.5 py-2 text-text-primary outline-none"
+                    >
+                      <option value={1}>1 Video</option>
+                      <option value={2}>2 Videos</option>
+                      <option value={3}>3 Videos</option>
+                      <option value={5}>5 Videos</option>
+                    </select>
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      isLoading={isHarvesting}
+                      icon={<RefreshCw className="w-3.5 h-3.5 text-accent" />}
+                      onClick={handleHarvestChannel}
+                    >
+                      Scan & Harvest
+                    </Button>
+                  </div>
+                </div>
+
+                {harvestedVideos.length > 0 && (
+                  <div className="p-2.5 bg-accent/10 border border-accent/20 rounded-control space-y-1 text-xs">
+                    <p className="font-semibold text-accent flex items-center gap-1.5">
+                      <Check className="w-3.5 h-3.5" />
+                      Harvest active: Queued {harvestedVideos.length} episodes for processing
+                    </p>
+                    <ul className="text-[11px] text-text-secondary list-disc pl-4 space-y-0.5 font-mono">
+                      {harvestedVideos.map((hv, idx) => (
+                        <li key={idx} className="truncate">{hv.title || hv.url}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Video Confirmation Pill */}
+              {(selectedVideo || youtubeUrl) && (
+                <div className="p-3 bg-accent/10 border border-accent/30 rounded-control flex items-center justify-between text-xs animate-in fade-in duration-150">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-12 h-8 rounded bg-black overflow-hidden shrink-0 border border-border">
+                      <img
+                        src={selectedVideo?.thumbnail_url || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=600&auto=format&fit=crop&q=80'}
+                        alt="Selected"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[10px] uppercase font-mono font-bold text-accent block">
+                        Selected Video to Harvest
+                      </span>
+                      <h4 className="font-semibold text-text-primary text-xs truncate max-w-lg">
+                        {selectedVideo?.title || youtubeUrl}
+                      </h4>
+                    </div>
+                  </div>
+                  <Badge variant="accent" size="sm">READY TO CLIP</Badge>
+                </div>
+              )}
+
+              {/* Discovered Video Cards Grid */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                  Discovered Videos ({searchResults.length})
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {searchResults.map((v) => {
+                    const isChosen = youtubeUrl === v.url || selectedVideo?.url === v.url
+                    return (
+                      <div
+                        key={v.id || v.url}
+                        className={`bg-[#141416] border rounded-card overflow-hidden flex flex-col justify-between transition-all ${
+                          isChosen
+                            ? 'border-accent shadow-md ring-1 ring-accent/30 bg-[#18181B]'
+                            : 'border-border hover:border-[#3F3F46]'
+                        }`}
+                      >
+                        {/* Thumbnail with overlay badges */}
+                        <div className="relative aspect-video bg-black overflow-hidden">
+                          <img
+                            src={v.thumbnail_url}
+                            alt={v.title}
+                            className="w-full h-full object-cover"
+                          />
+                          <span className="absolute bottom-1 right-1 px-1.5 py-0.2 rounded bg-black/80 text-[10px] font-mono text-white">
+                            {v.duration_formatted}
+                          </span>
+                          <span className="absolute top-1 left-1 px-1.5 py-0.2 rounded bg-accent/90 text-[10px] font-bold text-[#09090B] flex items-center gap-0.5">
+                            <Flame className="w-2.5 h-2.5 fill-current" /> {v.view_count_formatted}
+                          </span>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-3 flex-1 flex flex-col justify-between space-y-2.5">
+                          <div>
+                            <h4 className="font-semibold text-xs text-text-primary line-clamp-2 leading-snug">
+                              {v.title}
+                            </h4>
+                            <p className="text-[10px] text-text-muted mt-1 truncate">{v.channel}</p>
+                          </div>
+
+                          <Button
+                            variant={isChosen ? 'primary' : 'secondary'}
+                            size="sm"
+                            className="w-full"
+                            icon={isChosen ? <Check className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5 text-accent" />}
+                            onClick={() => handleSelectVideo(v)}
+                          >
+                            {isChosen ? 'Selected to Harvest' : 'Clip This Video'}
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: YOUTUBE URL */}
+          {sourceTab === 'youtube' && (
+            <div className="space-y-3 pt-1">
+              <Input
+                label="Direct YouTube Video Link"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+              />
+              <p className="text-[11px] text-text-muted">
+                Downloaded using local yt-dlp with automatic Creative Commons license detection and thumbnail caching.
+              </p>
+            </div>
+          )}
+
+          {/* TAB: LOCAL FILE */}
           {sourceTab === 'upload' && (
             <div className="border-2 border-dashed border-border hover:border-accent/60 rounded-card p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-[#0D0D10]">
               <UploadCloud className="w-8 h-8 text-accent mb-2" />
@@ -112,33 +409,7 @@ export const NewProjectScreen: React.FC = () => {
                 {uploadedFile ? uploadedFile : 'Drag and drop video file here, or click to browse'}
               </p>
               <p className="text-[11px] text-text-muted mt-1">
-                Supports ProRes, MP4, MKV, MOV up to 4K 60fps
-              </p>
-            </div>
-          )}
-
-          {sourceTab === 'youtube' && (
-            <div className="space-y-2">
-              <Input
-                label="YouTube Video Link"
-                placeholder="https://www.youtube.com/watch?v=..."
-                value={youtubeUrl}
-                onChange={(e) => setYoutubeUrl(e.target.value)}
-              />
-              <p className="text-[11px] text-text-muted">
-                Downloaded using local yt-dlp with automatic Creative Commons license detection.
-              </p>
-            </div>
-          )}
-
-          {sourceTab === 'channel' && (
-            <div className="space-y-2">
-              <Input
-                label="Channel URL or Handle"
-                placeholder="https://www.youtube.com/@hubermanlab"
-              />
-              <p className="text-[11px] text-text-muted">
-                Harvest top-performing recent uploads and process in batch.
+                Supports ProRes, MP4, MKV, MOV up to 4K 60fps with zero file size limits.
               </p>
             </div>
           )}
@@ -191,7 +462,7 @@ export const NewProjectScreen: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                  Brand Kit
+                  Brand Kit Preset
                 </label>
                 <select
                   className="w-full bg-[#18181B] border border-border text-xs rounded-control px-3 py-2 text-text-primary outline-none focus:border-accent"
@@ -253,10 +524,11 @@ export const NewProjectScreen: React.FC = () => {
           <div className="bg-[#18181B] border border-border/80 rounded-control p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <p className="text-xs text-text-primary font-medium">
-                Ready to extract {clipCount} clips (~{duration}s each) with Apple VideoToolbox.
+                Ready to harvest {clipCount} clips (~{duration}s each) from{' '}
+                <strong className="text-accent">{selectedVideo?.title ? selectedVideo.title.substring(0, 40) + '...' : (youtubeUrl ? youtubeUrl.substring(0, 40) + '...' : uploadedFile)}</strong>
               </p>
               <p className="text-[11px] text-text-muted">
-                Estimated processing time: ~45 seconds on Apple M4.
+                Estimated processing time: ~45 seconds on Apple M4 hardware encoder.
               </p>
             </div>
 
