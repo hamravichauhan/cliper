@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from src.cliplocal.core.models import JobState, CaptionStyleName, ReframeMode, Word
 from src.cliplocal.web.jobs import job_manager
-from src.cliplocal.web.db import list_jobs
+from src.cliplocal.web.db import list_jobs, get_analytics_summary
 from src.cliplocal.render.engine import render_candidate_clip
 from src.cliplocal.render.crop import build_crop_filter
 from src.cliplocal.render.ffmpeg import run_ffmpeg_render
@@ -76,6 +76,10 @@ async def upload_file(file: UploadFile = File(...)):
 async def get_all_jobs():
     return list_jobs()
 
+@app.get("/api/analytics")
+async def get_analytics():
+    return get_analytics_summary()
+
 @app.get("/api/jobs/{job_id}")
 async def get_job_status(job_id: str):
     job = job_manager.get_job_state(job_id)
@@ -87,6 +91,18 @@ async def get_job_status(job_id: str):
 async def cancel_job(job_id: str):
     success = job_manager.cancel_job(job_id)
     return {"cancelled": success}
+
+@app.delete("/api/jobs/{job_id}")
+async def delete_job_endpoint(job_id: str):
+    success = job_manager.delete_job(job_id)
+    return {"deleted": success}
+
+@app.post("/api/jobs/{job_id}/retry")
+async def retry_job_endpoint(job_id: str):
+    new_job = job_manager.retry_job(job_id)
+    if not new_job:
+        raise HTTPException(status_code=404, detail="Job could not be found to retry")
+    return {"job_id": new_job.job_id, "status": new_job.status}
 
 class ReRenderRequest(BaseModel):
     job_id: str

@@ -7,7 +7,7 @@ from src.cliplocal.core.models import (
     JobState, JobStatus, VideoMetadata, CandidateClip,
     CaptionStyleName, ReframeMode
 )
-from src.cliplocal.web.db import save_job, get_job
+from src.cliplocal.web.db import save_job, get_job, delete_job as db_delete_job
 from src.cliplocal.ingest.downloader import is_url, download_video
 from src.cliplocal.ingest.probe import probe_video
 from src.cliplocal.ingest.audio import extract_normalized_audio
@@ -81,6 +81,20 @@ class JobManager:
             self.active_jobs[job_id].stage = "Cancelled by user"
             return True
         return False
+
+    def delete_job(self, job_id: str) -> bool:
+        if job_id in self.active_jobs:
+            self.cancel_job(job_id)
+            del self.active_jobs[job_id]
+        return db_delete_job(job_id)
+
+    def retry_job(self, job_id: str) -> Optional[JobState]:
+        persisted = get_job(job_id)
+        if not persisted:
+            return None
+        source = persisted.get("source")
+        options = persisted.get("options") or {}
+        return self.submit_job(source, options)
 
     def get_job_state(self, job_id: str) -> Optional[JobState]:
         if job_id in self.active_jobs:
