@@ -45,7 +45,7 @@ def render_candidate_clip(
     reframe_mode: ReframeMode = ReframeMode.CENTER,
     auto_zoom: bool = True,
     multicam: bool = True,
-    top_banner: bool = True,
+    top_banner: bool = False,
     include_emojis: bool = True,
     include_sfx: bool = True,
     background_music: bool = False,
@@ -96,23 +96,21 @@ def render_candidate_clip(
     if anti_copyright:
         background_music = True
 
-    # Context / Hook Headline
+    # Context / Hook Headline (Only applied if top_banner is explicitly enabled)
     from src.cliplocal.context.extractor import extract_clip_context
-    if hook_headline and hook_headline.strip():
-        top_headline = hook_headline.strip()
-        candidate.title = top_headline
-        top_banner = True
-    elif teaser_stitch and candidate.sentences and len(candidate.sentences) >= 3:
-        climax = find_climax_teaser_sentence(candidate.sentences)
-        if climax:
-            top_headline = f"🚨 PREVIEW: {climax.text[:35]}..."
-            top_banner = True
+    if not candidate.title or candidate.title.strip().lower() in ("engaging moment", "untitled", "clip"):
+        candidate.title = extract_clip_context(candidate.text, candidate.sentences)
+
+    if top_banner:
+        if hook_headline and hook_headline.strip():
+            top_headline = hook_headline.strip()
+        elif teaser_stitch and candidate.sentences and len(candidate.sentences) >= 3:
+            climax = find_climax_teaser_sentence(candidate.sentences)
+            top_headline = f"🚨 PREVIEW: {climax.text[:35]}..." if climax else candidate.title
         else:
-            top_headline = candidate.title if top_banner else None
+            top_headline = candidate.title
     else:
-        if not candidate.title or candidate.title.strip().lower() in ("engaging moment", "untitled", "clip"):
-            candidate.title = extract_clip_context(candidate.text, candidate.sentences)
-        top_headline = candidate.title if top_banner else None
+        top_headline = None
 
     # 1. Generate ASS subtitles for this clip in /tmp
     ass_path = Path("/tmp") / f"cliplocal_subs_{candidate.clip_id}_{candidate.index}.ass"

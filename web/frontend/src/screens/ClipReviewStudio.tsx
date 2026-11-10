@@ -117,7 +117,7 @@ export const ClipReviewStudio: React.FC = () => {
   const [includeEmojis, setIncludeEmojis] = useState(true)
   const [includeSfx, setIncludeSfx] = useState(true)
   const [antiCopyright, setAntiCopyright] = useState(false)
-  const [topBanner, setTopBanner] = useState(true)
+  const [topBanner, setTopBanner] = useState(false)
   const [broll, setBroll] = useState(false)
   const [isPipelineReRendering, setIsPipelineReRendering] = useState(false)
 
@@ -148,12 +148,12 @@ export const ClipReviewStudio: React.FC = () => {
       hook_stinger_type: hookStingerType,
       hook_snap_zoom: hookSnapZoom,
       teaser_stitch: teaserStitch,
-      hook_headline: hookHeadline,
+      hook_headline: topBanner && hookHeadline ? hookHeadline : null,
+      top_banner: topBanner,
       background_music: clipAddSong,
       mute_original: clipMuteOriginal,
       music_track: clipSong,
       music_volume: clipSongVolume / 100.0,
-      top_banner: Boolean(hookHeadline),
       reframe_mode: reframeMode,
       auto_zoom: autoZoom,
       multicam: multiCam
@@ -484,26 +484,6 @@ export const ClipReviewStudio: React.FC = () => {
                 </div>
               </button>
 
-              {/* Live Hook Top Headline Banner on Mobile Canvas */}
-              {hookHeadline && (
-                <div className="absolute top-4 left-3 right-3 z-20 pointer-events-none transition-opacity duration-300">
-                  <div className="bg-black/85 backdrop-blur-md border border-white/20 rounded-md py-1.5 px-3 text-center shadow-2xl">
-                    <span className="text-[10px] font-black tracking-wide text-white font-sans uppercase drop-shadow-md">
-                      {hookHeadline}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* 0.0s Stinger Transient Pulse Indicator */}
-              {hookStinger && currentTime < 0.7 && (
-                <div className="absolute top-14 right-3 z-20 pointer-events-none animate-pulse">
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-accent/90 text-black font-bold uppercase shadow-lg">
-                    ⚡ {hookStingerType}
-                  </span>
-                </div>
-              )}
-
               {/* Live Retention Progress Bar on Mobile Canvas */}
               {retentionBar && (
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40 z-20 pointer-events-none">
@@ -815,49 +795,58 @@ export const ClipReviewStudio: React.FC = () => {
                   </p>
                 </div>
 
-                {/* 1. Hook Headline Banner */}
+                {/* 1. Optional Top Hook Headline Banner (Default OFF) */}
                 <div className="bg-[#18181B] border border-border rounded-card p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-text-primary">
-                      Top Hook Headline Banner
-                    </span>
-                    <span className="text-[10px] text-text-muted">Hooks silent scrollers</span>
-                  </div>
-                  <input
-                    type="text"
-                    value={hookHeadline}
-                    onChange={(e) => setHookHeadline(e.target.value)}
-                    placeholder="Enter viral headline banner..."
-                    className="w-full bg-[#111113] border border-border focus:border-accent text-xs rounded-control px-2.5 py-1.5 text-text-primary font-medium outline-none"
-                  />
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
-                      One-Click Viral Presets:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        '🚨 WAIT TILL THE END',
-                        '⚠️ THE BIGGEST MISTAKE',
-                        '🤫 NOBODY TALKS ABOUT THIS',
-                        '💡 WATCH THIS FIRST',
-                        '🔥 99% FAIL AT THIS',
-                        '❌ STOP DOING THIS'
-                      ].map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setHookHeadline(preset)}
-                          className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
-                            hookHeadline === preset
-                              ? 'bg-accent/20 text-accent border-accent/40 font-semibold'
-                              : 'bg-bg-surface text-text-secondary border-border hover:text-text-primary hover:border-[#3F3F46]'
-                          }`}
-                        >
-                          {preset}
-                        </button>
-                      ))}
+                    <div>
+                      <span className="text-xs font-semibold text-text-primary block">
+                        Top Hook Headline Banner
+                      </span>
+                      <span className="text-[10px] text-text-muted">
+                        Optional text overlay at top of video (Disabled by default)
+                      </span>
                     </div>
+                    <Toggle checked={topBanner} onChange={setTopBanner} />
                   </div>
+
+                  {topBanner && (
+                    <div className="space-y-2 pt-2 border-t border-border/40">
+                      <input
+                        type="text"
+                        value={hookHeadline}
+                        onChange={(e) => setHookHeadline(e.target.value)}
+                        placeholder="Enter headline banner text..."
+                        className="w-full bg-[#111113] border border-border focus:border-accent text-xs rounded-control px-2.5 py-1.5 text-text-primary font-medium outline-none"
+                      />
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+                          One-Click Viral Presets:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            '🚨 WAIT TILL THE END',
+                            '⚠️ THE BIGGEST MISTAKE',
+                            '🤫 NOBODY TALKS ABOUT THIS',
+                            '💡 WATCH THIS FIRST',
+                            '🔥 99% FAIL AT THIS'
+                          ].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setHookHeadline(preset)}
+                              className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                                hookHeadline === preset
+                                  ? 'bg-accent/20 text-accent border-accent/40 font-semibold'
+                                  : 'bg-bg-surface text-text-secondary border-border hover:text-text-primary hover:border-[#3F3F46]'
+                              }`}
+                            >
+                              {preset}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. 3-Second Hook Optimizer Pack */}

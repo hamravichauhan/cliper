@@ -50,7 +50,7 @@ class SubmitJobRequest(BaseModel):
     use_llm: bool = False
     auto_zoom: bool = True
     multicam: bool = True
-    top_banner: bool = True
+    top_banner: bool = False
     include_emojis: bool = True
     include_sfx: bool = True
     background_music: bool = False
@@ -168,7 +168,7 @@ class ReRenderRequest(BaseModel):
     reframe_mode: str = "center"
     auto_zoom: bool = True
     multicam: bool = True
-    top_banner: bool = True
+    top_banner: bool = False
     include_emojis: bool = True
     include_sfx: bool = True
     background_music: bool = False
