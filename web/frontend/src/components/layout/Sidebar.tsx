@@ -24,13 +24,14 @@ export const Sidebar: React.FC = () => {
     setScreen,
     sidebarCollapsed,
     toggleSidebar,
-    engineHealth
+    engineHealth,
+    clips
   } = useStore()
 
   const navItems: { id: ScreenType; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'home', label: 'Home', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'new-project', label: 'New Project', icon: <PlusCircle className="w-4 h-4 text-accent" /> },
-    { id: 'studio', label: 'Clip Review Studio', icon: <Scissors className="w-4 h-4 text-accent" />, badge: '5' },
+    { id: 'studio', label: 'Clip Review Studio', icon: <Scissors className="w-4 h-4 text-accent" />, badge: clips.length > 0 ? String(clips.length) : undefined },
     { id: 'projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" /> },
     { id: 'library', label: 'Library', icon: <Library className="w-4 h-4" /> },
     { id: 'brand-kits', label: 'Brand Kits', icon: <Palette className="w-4 h-4" /> },

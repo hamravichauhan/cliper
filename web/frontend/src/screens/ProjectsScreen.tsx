@@ -12,7 +12,8 @@ import {
   RefreshCw,
   Video,
   Loader2,
-  Sparkles
+  Sparkles,
+  ExternalLink
 } from 'lucide-react'
 
 export const ProjectsScreen: React.FC = () => {
@@ -140,30 +141,51 @@ export const ProjectsScreen: React.FC = () => {
                   <tr key={p.id} className="hover:bg-bg-elevated/40 transition-colors">
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-control bg-[#18181B] overflow-hidden border border-border shrink-0 flex items-center justify-center">
-                          {p.thumbnailUrl ? (
+                        <div className="w-10 h-10 rounded-control bg-[#18181B] overflow-hidden border border-border shrink-0 flex items-center justify-center relative">
+                          <Video className="w-4 h-4 text-accent/70 absolute pointer-events-none" />
+                          {p.thumbnailUrl && (
                             <img
                               src={p.thumbnailUrl}
                               alt=""
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover relative z-10"
                               onError={(e) => {
                                 (e.target as HTMLElement).style.display = 'none'
                               }}
                             />
-                          ) : (
-                            <Video className="w-4 h-4 text-accent/80" />
                           )}
                         </div>
                         <span
-                          className="font-semibold text-text-primary truncate max-w-xs block"
+                          className="font-semibold text-text-primary truncate max-w-xs block cursor-pointer hover:text-accent transition-colors"
                           title={p.title}
+                          onClick={() => {
+                            if (p.status === 'completed') selectProject(p.id)
+                            else if (p.status === 'processing') {
+                              setActiveJobId(p.id)
+                              setScreen('processing')
+                            }
+                          }}
                         >
                           {p.title}
                         </span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-[11px] text-text-muted truncate max-w-[160px]">
-                      {p.source}
+                    <td className="py-3.5 px-4">
+                      {p.source && p.source.startsWith('http') ? (
+                        <a
+                          href={p.source}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 font-mono text-[11px] text-text-muted hover:text-accent truncate max-w-[170px] transition-colors"
+                          title={p.source}
+                        >
+                          <span className="truncate">{p.source.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0 opacity-60" />
+                        </a>
+                      ) : (
+                        <span className="font-mono text-[11px] text-text-muted truncate max-w-[170px] block" title={p.source}>
+                          {p.source || 'Local Upload'}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4">
                       {p.status === 'completed' && <Badge variant="success">Completed</Badge>}
@@ -224,10 +246,13 @@ export const ProjectsScreen: React.FC = () => {
                           <Button
                             variant="secondary"
                             size="sm"
-                            className="text-text-muted"
-                            onClick={() => selectProject(p.id)}
+                            className="text-status-danger border-status-danger/40"
+                            onClick={() => {
+                              setActiveJobId(p.id)
+                              setScreen('processing')
+                            }}
                           >
-                            Inspect
+                            Inspect Error
                           </Button>
                         )}
 

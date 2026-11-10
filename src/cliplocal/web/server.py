@@ -183,7 +183,7 @@ class ReRenderRequest(BaseModel):
     pattern_zoom: bool = True
 
 @app.post("/api/clips/re-render")
-async def re_render_clip(req: ReRenderRequest):
+def re_render_clip(req: ReRenderRequest):
     job = job_manager.get_job_state(req.job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")

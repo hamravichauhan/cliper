@@ -232,18 +232,17 @@ export const HomeScreen: React.FC = () => {
                 className="py-3 flex items-center justify-between gap-4 cursor-pointer hover:bg-bg-elevated px-3 -mx-3 rounded-control transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-control bg-[#18181B] overflow-hidden border border-border shrink-0 flex items-center justify-center">
-                    {p.thumbnailUrl ? (
+                  <div className="w-10 h-10 rounded-control bg-[#18181B] overflow-hidden border border-border shrink-0 flex items-center justify-center relative">
+                    <Video className="w-4 h-4 text-accent/70 absolute pointer-events-none" />
+                    {p.thumbnailUrl && (
                       <img
                         src={p.thumbnailUrl}
                         alt=""
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover relative z-10"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none'
                         }}
                       />
-                    ) : (
-                      <Video className="w-4 h-4 text-accent/80" />
                     )}
                   </div>
                   <div className="min-w-0">

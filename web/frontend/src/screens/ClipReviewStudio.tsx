@@ -327,14 +327,20 @@ export const ClipReviewStudio: React.FC = () => {
                 >
                   <div className="flex gap-2.5 items-start">
                     {/* 9:16 Aspect Mini Thumbnail */}
-                    <div className="relative w-14 h-20 rounded-control overflow-hidden bg-black shrink-0 border border-border/80">
-                      <img
-                        src={c.thumbnailUrl}
-                        alt={c.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                      <span className="absolute bottom-1 right-1 text-[9px] font-mono font-medium text-white px-1 py-0.2 rounded bg-black/70">
+                    <div className="relative w-14 h-20 rounded-control overflow-hidden bg-[#18181B] shrink-0 border border-border/80 flex items-center justify-center">
+                      <Video className="w-5 h-5 text-accent/50 absolute pointer-events-none" />
+                      {c.thumbnailUrl && (
+                        <img
+                          src={c.thumbnailUrl}
+                          alt=""
+                          className="w-full h-full object-cover relative z-10 group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none'
+                          }}
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent z-20 pointer-events-none" />
+                      <span className="absolute bottom-1 right-1 text-[9px] font-mono font-medium text-white px-1 py-0.2 rounded bg-black/70 z-30">
                         {Math.round(c.duration)}s
                       </span>
                     </div>
