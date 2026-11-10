@@ -38,3 +38,26 @@ def test_generate_ass_subtitles(tmp_path):
     # Words should be offset by -10.0s, so start should be around 0:00:00.00
     assert "0:00:00.00" in content
     assert "\\t(0,70,\\fscx115\\fscy115)" in content
+
+def test_top_hook_banner_and_new_styles(tmp_path):
+    words = [
+        Word(word="Secret", start=5.0, end=5.4),
+        Word(word="formula", start=5.5, end=6.0),
+    ]
+
+    out_file = tmp_path / "banner_test.ass"
+    generate_ass_subtitles(
+        words=words,
+        output_ass_path=out_file,
+        time_offset=5.0,
+        style_name=CaptionStyleName.CYBERPUNK,
+        top_hook_headline="Why 99% Fail 🔥",
+        top_hook_persistent=False,
+        clip_duration=30.0
+    )
+
+    content = out_file.read_text(encoding="utf-8")
+    assert "Style: TopHook" in content
+    assert "WHY 99% FAIL 🔥" in content
+    assert "TopHook" in content
+    assert "\\fad(150,300)" in content

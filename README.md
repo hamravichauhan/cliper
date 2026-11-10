@@ -26,9 +26,23 @@ ClipLocal is a **100% free, fully offline, single-user** video-to-shorts tool de
   - **Mode E (Split-Stacked)**: Two-speaker vertical stacked layout with divider.
   - **Auto Mode**: Automatically selects the best mode based on detected faces.
 - **Animated Karaoke ASS Captions**:
-  - High-retention word-by-word popping highlights (Hormozi style, Minimalist, Boxed pill, and Neon glow).
+  - High-retention word-by-word popping highlights (Hormozi style, Cyberpunk, Emerald Cash, Fire Drop, Minimalist, Boxed pill, and Neon glow).
   - **Contextual Animated Emojis**: Automatic emoji injection above viral trigger words (e.g. 💰, 🔥, 🤫, 🛑, 🚀, 💡).
   - Safe-area margin compliance for TikTok, Reels, and Shorts.
+- **Top Hook Headline Pill Banners**:
+  - Persistent or 4.5s opening frosted pill banners pinned at the top-third safe zone to maximize 3-second hook retention.
+- **Simulated 2-Camera Multi-Cam Cuts**:
+  - Automatically alternates between Shot A (Wide 1.0x) and Shot B (Tight Close-Up 1.24x) on natural sentence boundaries and cadence resets.
+- **Local B-Roll & Visual Cutaways**:
+  - Automatically detects topic keywords (money, tech, growth, mind, warning) and overlays visual cutaway clips with audio dialogue preservation.
+- **🛡️ Anti-Copyright Transformative Engine**:
+  - **Acoustic Fingerprint Defeat**: 1.025x micro-tempo shift (`atempo=1.025`) and microphone vocal EQ coloring (`highpass=75`, presence boost at 2.4 kHz) destroys acoustic waveform alignment.
+  - **Visual Hashing Disruption**: 9:16 vertical crop (60% canvas altered), subtle contrast/saturation grading (`eq=contrast=1.04:saturation=1.06`), vignette, and multi-cam/B-roll cuts break continuous video sequence matching.
+  - **Audio Layer Masking**: Procedural Lo-Fi background track with `sidechaincompress` auto-ducking creates a dual-layer harmonic waveform that frustrates single-voice Content ID detection.
+- **📸 Viral Cover Thumbnail Extractor**:
+  - Evaluates candidate frames for Laplacian sharpness and expressive facial engagement, stamping high-contrast title banners onto 9:16 cover JPEGs ready for upload.
+- **⚡ Overnight Batch Folder Watcher**:
+  - Dedicated background daemon (`cliplocal watch <folder>`) that monitors a directory, processes videos sequentially within memory bounds, and moves originals to `done/`.
 - **Dynamic Punch-Ins (Auto-Zoom)**:
   - Automatic 1.15x close-up punch-ins on opening hook sentences and intermittent cadence resets every ~7 seconds.
 - **Viral SFX & Background Music with Auto-Ducking**:
@@ -111,14 +125,14 @@ This automatically launches the FastAPI studio and opens your default browser at
 ClipLocal includes a full-featured CLI for terminal workflows:
 
 ```bash
-# Process a local video or YouTube URL into 6 ranked shorts
-uv run cliplocal run /path/to/video.mp4 --clips 6 --style hormozi --mode auto
+# Process a local video or YouTube URL into 6 ranked shorts with Anti-Copyright & Multi-Cam
+uv run cliplocal run /path/to/video.mp4 --clips 6 --style hormozi --anti-copyright --multicam --top-banner
 
-# Process a YouTube URL without LLM re-ranking (pure heuristics)
-uv run cliplocal run "https://www.youtube.com/watch?v=..." --clips 5 --no-llm
+# Run with Cyberpunk or Emerald Cash style and B-Roll cutaways
+uv run cliplocal run fixtures/test_podcast_sample.mp4 --style cyberpunk --broll
 
-# Run with specific caption style (hormozi | minimal | boxed | neon)
-uv run cliplocal run fixtures/test_podcast_sample.mp4 --style neon --mode blur_fill
+# Overnight Batch Watcher: automatically process all videos dropped into a folder
+uv run cliplocal watch ./incoming_videos/ --output ./output/ --clips 5 --anti-copyright
 
 # Benchmark transcription backends on a sample audio file
 uv run cliplocal benchmark fixtures/test_audio.wav
@@ -130,8 +144,12 @@ uv run cliplocal benchmark fixtures/test_audio.wav
 | :--- | :--- | :--- |
 | `source` | *Required* | Path to local video file or YouTube URL |
 | `--clips, -c` | `6` | Number of top viral clips to render |
-| `--style, -s` | `hormozi` | Subtitle style: `hormozi`, `minimal`, `boxed`, `neon` |
-| `--mode, -m` | `center` | Reframing mode: `center`, `blur_fill`, `face_follow`, `auto` |
+| `--style, -s` | `hormozi` | Subtitle style: `hormozi`, `cyberpunk`, `emerald`, `fire`, `minimal`, `boxed`, `neon` |
+| `--mode, -m` | `auto` | Reframing mode: `auto`, `center`, `blur_fill`, `face_follow` |
+| `--anti-copyright` | `False` | Apply transformative tempo (1.025x), vocal EQ, visual grading, and harmonic music |
+| `--multicam` | `True` | Simulate 2-camera studio setup (wide vs tight snap-cuts on sentence boundaries) |
+| `--broll` | `False` | Insert visual B-roll cutaway overlays on topic keywords (dialogue preserved) |
+| `--top-banner` | `True` | Pin high-retention hook headline pill banner at top safe area |
 | `--backend, -b` | `mlx` | Whisper backend: `mlx`, `faster_whisper`, `whisper_cpp` |
 | `--no-llm` | `True` | Disable Ollama LLM enhancement and use pure heuristics |
 
@@ -159,13 +177,13 @@ scoring:
 
 ## Testing
 
-Run the automated test suite covering sentence segmentation, candidate generation, heuristic virality scoring, deduplication, ASS subtitles, crop smoothing, active speaker hysteresis, and jump-cut trimming:
+Run the automated test suite covering sentence segmentation, candidate generation, heuristic virality scoring, deduplication, ASS subtitles, crop smoothing, active speaker hysteresis, jump-cut trimming, anti-copyright transformative filters, B-roll overlays, and batch processing:
 
 ```bash
 uv run pytest tests/
 ```
 
-All 28 unit tests execute in under 1 second.
+All 39 unit and integration tests execute in under 12 seconds.
 
 ---
 

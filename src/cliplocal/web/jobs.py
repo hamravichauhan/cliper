@@ -224,9 +224,14 @@ class JobManager:
                 metadata=metadata,
                 reframe_mode=reframe_mode,
                 auto_zoom=bool(options.get("auto_zoom", True)),
+                multicam=bool(options.get("multicam", True)),
+                top_banner=bool(options.get("top_banner", True)),
                 include_emojis=bool(options.get("include_emojis", True)),
                 include_sfx=bool(options.get("include_sfx", True)),
-                background_music=bool(options.get("background_music", False))
+                background_music=bool(options.get("background_music", False)),
+                anti_copyright=bool(options.get("anti_copyright", False)),
+                broll=bool(options.get("broll", False)),
+                extract_thumbnails=True
             )
             rendered_list.append(cand)
             step_progress = 70.0 + ((i + 1) / len(top_candidates)) * 28.0

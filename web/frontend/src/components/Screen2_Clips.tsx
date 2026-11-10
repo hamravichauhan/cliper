@@ -135,6 +135,39 @@ export const Screen2_Clips: React.FC<Props> = ({ job, onEditClip, onNewJob }) =>
                   )}
                 </div>
 
+                {/* Viral Thumbnails / Covers */}
+                {clip.thumbnails && clip.thumbnails.length > 0 && (
+                  <div className="border-t border-slate-800/80 pt-3">
+                    <div className="text-[11px] font-semibold text-slate-400 mb-2 flex items-center justify-between">
+                      <span>📸 Viral Cover Cards ({clip.thumbnails.length})</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {clip.thumbnails.map((thumbPath: string, tIdx: number) => {
+                        const thumbUrl = `/api/media/stream?path=${encodeURIComponent(thumbPath)}`
+                        return (
+                          <a
+                            key={tIdx}
+                            href={thumbUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            download={`clip_${clip.index || idx + 1}_cover_${tIdx + 1}.jpg`}
+                            className="group relative w-1/3 aspect-[9/16] rounded-lg overflow-hidden border border-slate-800 hover:border-violet-500 transition-colors block bg-black"
+                            title={`Download Cover #${tIdx + 1}`}
+                          >
+                            <img src={thumbUrl} alt="Cover Thumbnail" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                              <Download className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="absolute bottom-1 right-1 px-1 bg-black/80 rounded text-[9px] font-mono text-white">
+                              #{tIdx + 1}
+                            </span>
+                          </a>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800">
                   <button

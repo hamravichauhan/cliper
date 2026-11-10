@@ -16,6 +16,9 @@ class CaptionStyleName(str, Enum):
     MINIMAL = "minimal"
     BOXED = "boxed"
     NEON = "neon"
+    CYBERPUNK = "cyberpunk"
+    EMERALD = "emerald"
+    FIRE = "fire"
 
 class Word(BaseModel):
     word: str
@@ -82,6 +85,11 @@ class CandidateClip(BaseModel):
     reframe_mode: ReframeMode = ReframeMode.AUTO
     caption_style: CaptionStyleName = CaptionStyleName.HORMOZI
     output_path: Optional[str] = None
+    thumbnails: List[str] = Field(default_factory=list)
+    top_banner: bool = True
+    multicam: bool = True
+    anti_copyright: bool = False
+    broll: bool = False
 
 class JobStatus(str, Enum):
     QUEUED = "queued"

@@ -34,6 +34,8 @@ echo "✔ FFmpeg verified with libass and VideoToolbox hardware acceleration."
 # 4. Install Python Dependencies
 echo "🐍 Syncing Python virtual environment with uv (Python 3.11+)..."
 uv sync
+uv pip install -e .
+uv run python -c "import site, pathlib; p = pathlib.Path(site.getsitepackages()[0]) / 'kalp.pth'; p.write_text(f'{pathlib.Path.cwd()}\n{pathlib.Path.cwd()}/src\n')"
 
 # 5. Build Web Frontend SPA
 echo "⚛️ Building React + Vite Web UI..."

@@ -1,5 +1,18 @@
 import pytest
-from src.cliplocal.render.zoom import compute_punch_in_intervals, build_dynamic_zoom_filter
+from src.cliplocal.render.zoom import compute_punch_in_intervals, compute_multicam_intervals, build_dynamic_zoom_filter
+from src.cliplocal.core.models import Sentence, Word
+
+def test_compute_multicam_intervals():
+    sentences = [
+        Sentence(index=0, start=10.0, end=13.0, text="Hook sentence here", words=[]),
+        Sentence(index=1, start=13.2, end=17.0, text="Second sentence context", words=[]),
+        Sentence(index=2, start=17.2, end=21.0, text="Third sentence punchline", words=[]),
+    ]
+    intervals = compute_multicam_intervals(clip_duration=15.0, sentences=sentences, time_offset=10.0)
+    assert len(intervals) >= 1
+    # First interval starts at 0.0 (relative to offset 10.0)
+    assert intervals[0][0] == 0.0
+    assert intervals[0][1] == 3.0
 
 def test_compute_punch_in_intervals():
     intervals = compute_punch_in_intervals(clip_duration=30.0, sentences=[])

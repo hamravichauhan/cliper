@@ -17,6 +17,10 @@ export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpd
   const [includeEmojis, setIncludeEmojis] = useState<boolean>(clip.include_emojis ?? true)
   const [includeSfx, setIncludeSfx] = useState<boolean>(clip.include_sfx ?? true)
   const [bgMusic, setBgMusic] = useState<boolean>(clip.background_music ?? false)
+  const [antiCopyright, setAntiCopyright] = useState<boolean>(clip.anti_copyright ?? false)
+  const [multicam, setMulticam] = useState<boolean>(clip.multicam ?? true)
+  const [topBanner, setTopBanner] = useState<boolean>(clip.top_banner ?? true)
+  const [broll, setBroll] = useState<boolean>(clip.broll ?? false)
   const [deletedIndices, setDeletedIndices] = useState<Set<number>>(new Set())
   const [isReRendering, setIsReRendering] = useState<boolean>(false)
   const [videoSrc, setVideoSrc] = useState<string>(
@@ -52,7 +56,11 @@ export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpd
           auto_zoom: autoZoom,
           include_emojis: includeEmojis,
           include_sfx: includeSfx,
-          background_music: bgMusic
+          background_music: bgMusic || antiCopyright,
+          anti_copyright: antiCopyright,
+          multicam: multicam,
+          top_banner: topBanner,
+          broll: broll
         })
       })
 
@@ -190,9 +198,12 @@ export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpd
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
               >
                 <option value="hormozi">🔥 Hormozi Bold</option>
+                <option value="cyberpunk">⚡ Cyberpunk (Cyan/Magenta)</option>
+                <option value="emerald">💎 Emerald Cash (Mint Green)</option>
+                <option value="fire">💥 Fire Drop (Yellow/Red)</option>
                 <option value="minimal">✨ Minimalist</option>
                 <option value="boxed">🏷️ Boxed Pill</option>
-                <option value="neon">⚡ Neon Glow</option>
+                <option value="neon">🌈 Neon Glow</option>
               </select>
             </div>
 
@@ -203,6 +214,7 @@ export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpd
                 onChange={(e) => setReframeMode(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
               >
+                <option value="auto">🤖 Auto-Detect</option>
                 <option value="center">🎯 Center Crop</option>
                 <option value="blur_fill">🌫️ Blur-Fill</option>
                 <option value="face_follow">👤 Face-Follow</option>
@@ -213,9 +225,61 @@ export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpd
           {/* Viral Enhancements Toggles */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2">
             <label className="text-xs font-semibold text-slate-400 uppercase block mb-1">
-              Active Enhancements
+              Active Enhancements & Anti-Copyright Protection
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setAntiCopyright(!antiCopyright)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                  antiCopyright
+                    ? 'bg-rose-500/20 border-rose-500 text-rose-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                }`}
+              >
+                <span>🛡️ Anti-Copy</span>
+                <span className="text-[10px]">{antiCopyright ? 'ON' : 'OFF'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMulticam(!multicam)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                  multicam
+                    ? 'bg-violet-500/15 border-violet-500 text-violet-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                }`}
+              >
+                <span>🎥 Multi-Cam</span>
+                <span className="text-[10px]">{multicam ? 'ON' : 'OFF'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTopBanner(!topBanner)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                  topBanner
+                    ? 'bg-amber-500/15 border-amber-500 text-amber-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                }`}
+              >
+                <span>🏷️ Top Banner</span>
+                <span className="text-[10px]">{topBanner ? 'ON' : 'OFF'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBroll(!broll)}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                  broll
+                    ? 'bg-blue-500/15 border-blue-500 text-blue-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-500'
+                }`}
+              >
+                <span>🖼️ B-Roll</span>
+                <span className="text-[10px]">{broll ? 'ON' : 'OFF'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setAutoZoom(!autoZoom)}
@@ -259,13 +323,13 @@ export const Screen3_Editor: React.FC<Props> = ({ clip, jobId, onBack, onClipUpd
                 type="button"
                 onClick={() => setBgMusic(!bgMusic)}
                 className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
-                  bgMusic
+                  bgMusic || antiCopyright
                     ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300'
                     : 'bg-slate-950 border-slate-800 text-slate-500'
                 }`}
               >
                 <span>🎵 Music</span>
-                <span className="text-[10px]">{bgMusic ? 'ON' : 'OFF'}</span>
+                <span className="text-[10px]">{bgMusic || antiCopyright ? 'ON' : 'OFF'}</span>
               </button>
             </div>
           </div>

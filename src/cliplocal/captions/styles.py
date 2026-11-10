@@ -74,6 +74,48 @@ STYLES: Dict[CaptionStyleName, CaptionStyleConfig] = {
         shadow_offset=4,
         highlight_scale=115,
         margin_v=280
+    ),
+    CaptionStyleName.CYBERPUNK: CaptionStyleConfig(
+        name=CaptionStyleName.CYBERPUNK,
+        font_name="Arial",
+        font_size=50,
+        bold=True,
+        uppercase=True,
+        primary_color="#FFFFFF",
+        highlight_color="#00F0FF", # Vibrant Cyan pop
+        outline_color="#FF007F", # Magenta outline
+        outline_width=5,
+        shadow_offset=3,
+        highlight_scale=118,
+        margin_v=280
+    ),
+    CaptionStyleName.EMERALD: CaptionStyleConfig(
+        name=CaptionStyleName.EMERALD,
+        font_name="Arial",
+        font_size=50,
+        bold=True,
+        uppercase=True,
+        primary_color="#FFFFFF",
+        highlight_color="#00FF88", # Emerald mint cash pop
+        outline_color="#0B3019", # Dark emerald outline
+        outline_width=5,
+        shadow_offset=3,
+        highlight_scale=115,
+        margin_v=280
+    ),
+    CaptionStyleName.FIRE: CaptionStyleConfig(
+        name=CaptionStyleName.FIRE,
+        font_name="Arial",
+        font_size=52,
+        bold=True,
+        uppercase=True,
+        primary_color="#FFFF00", # Yellow body
+        highlight_color="#FF2A00", # Blazing red-orange pop
+        outline_color="#000000", # Heavy black stroke
+        outline_width=6,
+        shadow_offset=3,
+        highlight_scale=120,
+        margin_v=280
     )
 }
 

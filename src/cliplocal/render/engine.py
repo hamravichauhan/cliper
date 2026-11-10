@@ -1,15 +1,26 @@
 import json
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from src.cliplocal.core.models import CandidateClip, ReframeMode, VideoMetadata
 from src.cliplocal.captions.ass_generator import generate_ass_subtitles
 from src.cliplocal.render.crop import build_crop_filter
-from src.cliplocal.render.zoom import compute_punch_in_intervals, build_dynamic_zoom_filter
+from src.cliplocal.render.zoom import (
+    compute_punch_in_intervals,
+    compute_multicam_intervals,
+    build_dynamic_zoom_filter
+)
 from src.cliplocal.render.ffmpeg import run_ffmpeg_render
 from src.cliplocal.reframe.face_tracker import FaceTracker
 from src.cliplocal.audio.sfx import find_sfx_trigger_points, ensure_sfx_assets
 from src.cliplocal.audio.music import ensure_ambient_music, build_ducking_audio_filter
+from src.cliplocal.transform.copyright import (
+    build_transformative_audio_filter,
+    build_transformative_video_filter,
+    get_transformative_meta
+)
+from src.cliplocal.broll.engine import find_broll_cutaways
+from src.cliplocal.render.thumbnail import extract_viral_thumbnails
 from src.cliplocal.config.settings import config
 
 _face_tracker: Optional[FaceTracker] = None
@@ -32,13 +43,19 @@ def render_candidate_clip(
     metadata: Optional[VideoMetadata] = None,
     reframe_mode: ReframeMode = ReframeMode.CENTER,
     auto_zoom: bool = True,
+    multicam: bool = True,
+    top_banner: bool = True,
     include_emojis: bool = True,
     include_sfx: bool = True,
-    background_music: bool = False
+    background_music: bool = False,
+    anti_copyright: bool = False,
+    broll: bool = False,
+    extract_thumbnails: bool = True
 ) -> Path:
     """
-    Render a short clip with 9:16 framing, dynamic punch-ins, burned-in ASS captions,
-    contextual emojis, sound effects, background music auto-ducking, and loudnorm audio.
+    Render a short clip with 9:16 framing, simulated multi-cam cuts, burned-in ASS captions,
+    top hook headline banner, contextual emojis, sound effects, auto-ducked music,
+    transformative anti-copyright filters, and viral thumbnail generation.
     """
     vp = Path(video_path).resolve()
     base_out = Path(output_dir).resolve()
@@ -50,14 +67,23 @@ def render_candidate_clip(
     mp4_out = base_out / clip_filename
     json_out = base_out / sidecar_filename
 
-    # 1. Generate ASS subtitles for this clip in /tmp to avoid any path quoting issues
+    # If anti-copyright is enabled, automatically layer background music for audio masking
+    if anti_copyright:
+        background_music = True
+
+    # 1. Generate ASS subtitles for this clip in /tmp
     ass_path = Path("/tmp") / f"cliplocal_subs_{candidate.clip_id}_{candidate.index}.ass"
+    top_headline = (candidate.title or candidate.text[:40]) if top_banner else None
+
     generate_ass_subtitles(
         words=candidate.words,
         output_ass_path=ass_path,
         time_offset=candidate.start,
         style_name=candidate.caption_style,
-        include_emojis=include_emojis
+        include_emojis=include_emojis,
+        top_hook_headline=top_headline,
+        top_hook_persistent=False,
+        clip_duration=candidate.duration
     )
 
     # 2. Reframe Analysis & Filter Construction
@@ -78,19 +104,50 @@ def render_candidate_clip(
         except Exception:
             effective_mode = ReframeMode.CENTER
 
-    # Apply Auto-Zoom if mode is FACE_FOLLOW or CENTER
-    if auto_zoom and effective_mode in (ReframeMode.FACE_FOLLOW, ReframeMode.CENTER):
-        zoom_intervals = compute_punch_in_intervals(candidate.duration, candidate.sentences)
-        crop_filter = build_dynamic_zoom_filter(
-            in_w=in_w,
-            in_h=in_h,
-            out_w=1080,
-            out_h=1920,
-            center_x_ratio=center_x,
-            intervals=zoom_intervals
-        )
+    # Video Filter Construction
+    extra_inputs: List[str] = []
+    video_filter_parts: List[str] = []
+    next_input_idx = 1
+
+    # Base Crop with Multi-Cam or Auto-Zoom
+    if effective_mode in (ReframeMode.FACE_FOLLOW, ReframeMode.CENTER):
+        if multicam and candidate.sentences:
+            intervals = compute_multicam_intervals(
+                candidate.duration,
+                candidate.sentences,
+                time_offset=candidate.start
+            )
+            base_crop = build_dynamic_zoom_filter(
+                in_w=in_w,
+                in_h=in_h,
+                out_w=1080,
+                out_h=1920,
+                center_x_ratio=center_x,
+                intervals=intervals,
+                zoom_factor=1.24
+            )
+        elif auto_zoom:
+            intervals = compute_punch_in_intervals(candidate.duration, candidate.sentences)
+            base_crop = build_dynamic_zoom_filter(
+                in_w=in_w,
+                in_h=in_h,
+                out_w=1080,
+                out_h=1920,
+                center_x_ratio=center_x,
+                intervals=intervals,
+                zoom_factor=1.15
+            )
+        else:
+            base_crop = build_crop_filter(
+                mode=effective_mode,
+                in_w=in_w,
+                in_h=in_h,
+                out_w=1080,
+                out_h=1920,
+                center_x_ratio=center_x
+            )
     else:
-        crop_filter = build_crop_filter(
+        base_crop = build_crop_filter(
             mode=effective_mode,
             in_w=in_w,
             in_h=in_h,
@@ -99,15 +156,46 @@ def render_candidate_clip(
             center_x_ratio=center_x
         )
 
-    # Path for FFmpeg libass filter
-    escaped_ass = str(ass_path).replace("\\", "/").replace(":", "\\:")
-    video_filter = f"{crop_filter};[v_reframed]ass={escaped_ass}[v_out]"
+    video_filter_parts.append(base_crop)
+    curr_v_label = "v_reframed"
 
-    # 3. Audio Enhancements (SFX & Music Ducking)
-    extra_inputs = []
-    audio_filter_parts = []
+    # Optional B-Roll Cutaway Overlays
+    if broll and candidate.words:
+        cutaways = find_broll_cutaways(
+            words=candidate.words,
+            time_offset=candidate.start,
+            clip_duration=candidate.duration,
+            max_cutaways=2
+        )
+        for i, cut in enumerate(cutaways):
+            extra_inputs.append(cut.asset_path)
+            broll_in_idx = next_input_idx
+            next_input_idx += 1
+            scaled_label = f"broll_sc_{i}"
+            next_v_label = f"v_broll_{i}"
+
+            video_filter_parts.append(
+                f"[{broll_in_idx}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[{scaled_label}]"
+            )
+            video_filter_parts.append(
+                f"[{curr_v_label}][{scaled_label}]overlay=0:0:enable='between(t,{cut.t_start:.2f},{cut.t_end:.2f})'[{next_v_label}]"
+            )
+            curr_v_label = next_v_label
+
+    # Optional Anti-Copyright Transformative Video Filter
+    if anti_copyright:
+        v_trans_filter, next_v_label = build_transformative_video_filter(curr_v_label, "v_trans")
+        video_filter_parts.append(v_trans_filter)
+        curr_v_label = next_v_label
+
+    # Subtitles burn-in
+    escaped_ass = str(ass_path).replace("\\", "/").replace(":", "\\:")
+    video_filter_parts.append(f"[{curr_v_label}]ass={escaped_ass}[v_out]")
+    full_video_filter = ";".join(video_filter_parts)
+
+    # 3. Audio Filter Construction
+    audio_filter_parts: List[str] = []
     current_audio_label = "0:a"
-    next_input_idx = 1
 
     # Optional Sound Effects on Keywords
     if include_sfx and candidate.words:
@@ -115,7 +203,6 @@ def render_candidate_clip(
         triggers = find_sfx_trigger_points(candidate.words, candidate.start)
 
         if triggers:
-            # Map up to 4 trigger points
             sfx_labels = []
             for t_offset, sfx_type in triggers[:4]:
                 sfx_file = sfx_assets.get(sfx_type, sfx_assets["pop"])
@@ -124,19 +211,23 @@ def render_candidate_clip(
                 next_input_idx += 1
                 delay_ms = int(t_offset * 1000)
                 sfx_label = f"sfx{sfx_in_idx}"
-                # Add delay and volume
                 audio_filter_parts.append(
                     f"[{sfx_in_idx}:a]adelay={delay_ms}|{delay_ms},volume=0.35[{sfx_label}]"
                 )
                 sfx_labels.append(f"[{sfx_label}]")
 
-            # Mix voice with delayed SFX
             all_sfx_inputs = f"[{current_audio_label}]" + "".join(sfx_labels)
             num_inputs = len(sfx_labels) + 1
             audio_filter_parts.append(
                 f"{all_sfx_inputs}amix=inputs={num_inputs}:dropout_transition=0:weights=1.0 " + " ".join(["0.4"] * len(sfx_labels)) + "[a_with_sfx]"
             )
             current_audio_label = "a_with_sfx"
+
+    # Optional Anti-Copyright Transformative Audio Filter (Tempo & Vocal EQ)
+    if anti_copyright:
+        a_trans_filter, next_a_label = build_transformative_audio_filter(current_audio_label, "a_trans")
+        audio_filter_parts.append(a_trans_filter)
+        current_audio_label = next_a_label
 
     # Optional Background Music with Auto-Ducking
     if background_music:
@@ -159,7 +250,7 @@ def render_candidate_clip(
     audio_filter_parts.append(f"[{current_audio_label}]loudnorm=I=-14:TP=-1.5:LRA=11[a_out]")
     full_audio_filter = ";".join(audio_filter_parts)
 
-    full_filter_complex = f"{video_filter};{full_audio_filter}"
+    full_filter_complex = f"{full_video_filter};{full_audio_filter}"
 
     # 4. Transcode with FFmpeg
     run_ffmpeg_render(
@@ -168,7 +259,7 @@ def render_candidate_clip(
         duration=candidate.duration,
         filter_complex=full_filter_complex,
         output_mp4=mp4_out,
-        audio_loudnorm=False, # already handled in filter complex
+        audio_loudnorm=False,
         extra_inputs=extra_inputs
     )
 
@@ -178,8 +269,26 @@ def render_candidate_clip(
     except Exception:
         pass
 
-    # 6. Write JSON sidecar
+    # 6. Extract Viral Thumbnails
+    thumb_paths: List[Path] = []
+    if extract_thumbnails:
+        try:
+            thumb_paths = extract_viral_thumbnails(
+                video_path=vp,
+                start_sec=candidate.start,
+                duration=candidate.duration,
+                title=candidate.title,
+                output_dir=base_out,
+                clip_index=candidate.index,
+                count=3
+            )
+        except Exception:
+            thumb_paths = []
+
+    candidate.thumbnails = [str(t) for t in thumb_paths]
     candidate.output_path = str(mp4_out)
+
+    # 7. Write JSON sidecar
     sidecar_data = {
         "clip_id": candidate.clip_id,
         "index": candidate.index,
@@ -193,12 +302,20 @@ def render_candidate_clip(
         "reframe_mode": reframe_mode.value,
         "caption_style": candidate.caption_style.value,
         "auto_zoom": auto_zoom,
+        "multicam": multicam,
+        "top_banner": top_banner,
         "include_emojis": include_emojis,
         "include_sfx": include_sfx,
         "background_music": background_music,
+        "anti_copyright": anti_copyright,
+        "broll": broll,
+        "thumbnails": candidate.thumbnails,
         "score_breakdown": candidate.score.model_dump(),
         "transcript_excerpt": candidate.text
     }
+
+    if anti_copyright:
+        sidecar_data["transformative_meta"] = get_transformative_meta()
 
     with open(json_out, "w", encoding="utf-8") as f:
         json.dump(sidecar_data, f, indent=2)

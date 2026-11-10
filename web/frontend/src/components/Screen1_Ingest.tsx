@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { UploadCloud, Link as LinkIcon, Sparkles, Sliders, Play, Terminal, CheckCircle2, AlertCircle } from 'lucide-react'
+import { UploadCloud, Link as LinkIcon, Sparkles, Sliders, Play, Terminal, CheckCircle2, AlertCircle, ShieldAlert } from 'lucide-react'
 
 interface Props {
   onJobStarted: (jobId: string) => void
@@ -18,9 +18,13 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
   const [backend, setBackend] = useState('mlx')
   const [useLLM, setUseLLM] = useState(false)
   const [autoZoom, setAutoZoom] = useState(true)
+  const [multicam, setMulticam] = useState(true)
+  const [topBanner, setTopBanner] = useState(true)
   const [includeEmojis, setIncludeEmojis] = useState(true)
   const [includeSfx, setIncludeSfx] = useState(true)
   const [bgMusic, setBgMusic] = useState(false)
+  const [antiCopyright, setAntiCopyright] = useState(false)
+  const [broll, setBroll] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
 
@@ -51,9 +55,13 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
           backend,
           use_llm: useLLM,
           auto_zoom: autoZoom,
+          multicam: multicam,
+          top_banner: topBanner,
           include_emojis: includeEmojis,
           include_sfx: includeSfx,
-          background_music: bgMusic
+          background_music: bgMusic || antiCopyright,
+          anti_copyright: antiCopyright,
+          broll: broll
         })
       })
       const jobData = await jobRes.json()
@@ -70,13 +78,13 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
     <div className="max-w-4xl mx-auto space-y-8 py-6">
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 text-xs font-semibold uppercase tracking-wider">
-          <Sparkles className="w-3.5 h-3.5" /> 100% Free & Local Apple Silicon Pipeline
+          <Sparkles className="w-3.5 h-3.5" /> 100% Free & Local Processing
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
           Turn Long Videos Into <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-fuchsia-400 to-indigo-400">Viral Shorts</span>
         </h1>
         <p className="text-slate-400 text-base max-w-2xl mx-auto">
-          AI transcription, viral hook scoring, face-tracking 9:16 reframe, and animated popping captions—running completely on your Mac mini M4.
+          Word-level AI transcription, virality scoring, face tracking, simulated multi-cam, top hook banners, and anti-copyright transformative filtering.
         </p>
       </div>
 
@@ -103,50 +111,52 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
 
         {sourceType === 'url' ? (
           <div>
-            <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Video URL</label>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Video URL (YouTube, Vimeo, etc.)
+            </label>
             <input
               type="text"
+              placeholder="https://www.youtube.com/watch?v=..."
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=... or local test path"
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-violet-500 transition-colors"
             />
-            <p className="text-xs text-slate-500 mt-2">
-              Tip: Test with sample fixture: <code className="text-violet-400 cursor-pointer" onClick={() => setUrl('fixtures/test_podcast_sample.mp4')}>fixtures/test_podcast_sample.mp4</code>
-            </p>
           </div>
         ) : (
-          <div className="border-2 border-dashed border-slate-700 hover:border-violet-500 rounded-xl p-8 text-center transition-colors">
+          <div className="border-2 border-dashed border-slate-700 hover:border-violet-500/60 rounded-xl p-8 text-center transition-colors">
+            <UploadCloud className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <p className="text-sm font-medium text-slate-300">
+              {file ? file.name : 'Select or drag a horizontal video file (.mp4, .mov, .mkv)'}
+            </p>
             <input
               type="file"
               accept="video/*"
-              id="file-upload"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
               className="hidden"
-              onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+              id="file-upload"
             />
-            <label htmlFor="file-upload" className="cursor-pointer space-y-2 block">
-              <UploadCloud className="w-10 h-10 text-violet-400 mx-auto" />
-              <div className="text-sm font-medium text-slate-200">
-                {file ? file.name : 'Click to select or drag and drop a video file'}
-              </div>
-              <div className="text-xs text-slate-500">MP4, MOV, MKV up to 3 hours</div>
+            <label
+              htmlFor="file-upload"
+              className="inline-block mt-3 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-violet-400 rounded-lg cursor-pointer transition-colors"
+            >
+              Browse Local File
             </label>
           </div>
         )}
 
-        {/* Options Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+        {/* Configuration Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2 border-t border-slate-800/80">
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase mb-2">
-              Clip Count: <span className="text-violet-400 font-bold">{clipsCount}</span>
+              Clips to Generate: <span className="text-violet-400 font-bold">{clipsCount}</span>
             </label>
             <input
               type="range"
               min="1"
-              max="10"
+              max="12"
               value={clipsCount}
               onChange={(e) => setClipsCount(Number(e.target.value))}
-              className="w-full accent-violet-500"
+              className="w-full accent-violet-500 cursor-pointer"
             />
           </div>
 
@@ -182,9 +192,12 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 focus:border-violet-500"
             >
               <option value="hormozi">🔥 Hormozi Bold (Yellow Pop)</option>
+              <option value="cyberpunk">⚡ Cyberpunk (Cyan & Magenta)</option>
+              <option value="emerald">💎 Emerald Cash (Mint Green)</option>
+              <option value="fire">💥 Fire Drop (Yellow & Red)</option>
               <option value="minimal">✨ Minimalist (Clean Blue)</option>
               <option value="boxed">🏷️ Boxed Pill (High Contrast)</option>
-              <option value="neon">⚡ Neon Glow (Cyan & Magenta)</option>
+              <option value="neon">🌈 Neon Glow</option>
             </select>
           </div>
 
@@ -210,7 +223,7 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200"
             >
               <option value="mlx">⚡ Apple MLX Whisper (Metal GPU)</option>
-              <option value="faster_whisper">⚙️ Faster-Whisper (CPU int8)</option>
+              <option value="faster_whisper">⚙️ Faster-Whisper (CPU / CUDA)</option>
               <option value="whisper_cpp">🔨 Whisper.cpp CLI (Metal)</option>
             </select>
           </div>
@@ -236,12 +249,64 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
           </div>
         </div>
 
-        {/* Viral Enhancements Chips */}
-        <div className="border-t border-slate-800/80 pt-4">
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-            Viral Enhancements (Auto-Zoom, Emojis, Audio)
+        {/* Viral & Transformative Protective Enhancements */}
+        <div className="border-t border-slate-800/80 pt-4 space-y-3">
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Viral & Transformative Protective Features
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <button
+              type="button"
+              onClick={() => setAntiCopyright(!antiCopyright)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                antiCopyright
+                  ? 'bg-rose-500/20 border-rose-500 text-rose-300 shadow-sm'
+                  : 'bg-slate-950 border-slate-800 text-slate-400'
+              }`}
+            >
+              <span>🛡️ Anti-Copyright</span>
+              <span className="text-[10px]">{antiCopyright ? 'ON' : 'OFF'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMulticam(!multicam)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                multicam
+                  ? 'bg-violet-500/15 border-violet-500 text-violet-300 shadow-sm'
+                  : 'bg-slate-950 border-slate-800 text-slate-500'
+              }`}
+            >
+              <span>🎥 Multi-Cam Cut</span>
+              <span className="text-[10px]">{multicam ? 'ON' : 'OFF'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTopBanner(!topBanner)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                topBanner
+                  ? 'bg-amber-500/15 border-amber-500 text-amber-300 shadow-sm'
+                  : 'bg-slate-950 border-slate-800 text-slate-500'
+              }`}
+            >
+              <span>🏷️ Top Hook Pill</span>
+              <span className="text-[10px]">{topBanner ? 'ON' : 'OFF'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setBroll(!broll)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
+                broll
+                  ? 'bg-blue-500/15 border-blue-500 text-blue-300 shadow-sm'
+                  : 'bg-slate-950 border-slate-800 text-slate-500'
+              }`}
+            >
+              <span>🖼️ B-Roll Inserts</span>
+              <span className="text-[10px]">{broll ? 'ON' : 'OFF'}</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setAutoZoom(!autoZoom)}
@@ -285,13 +350,13 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
               type="button"
               onClick={() => setBgMusic(!bgMusic)}
               className={`px-3 py-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all ${
-                bgMusic
+                bgMusic || antiCopyright
                   ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300 shadow-sm'
                   : 'bg-slate-950 border-slate-800 text-slate-500'
               }`}
             >
               <span>🎵 Lo-Fi Music</span>
-              <span className="text-[10px]">{bgMusic ? 'ON' : 'OFF'}</span>
+              <span className="text-[10px]">{bgMusic || antiCopyright ? 'ON' : 'OFF'}</span>
             </button>
           </div>
         </div>
@@ -338,7 +403,7 @@ export const Screen1_Ingest: React.FC<Props> = ({ onJobStarted, currentJob }) =>
               <Terminal className="w-3.5 h-3.5" /> Pipeline Live Stream Console:
             </div>
             {currentJob.log_messages && currentJob.log_messages.map((log: string, idx: number) => (
-              <div key={idx} className="text-emerald-400/90 leading-relaxed">
+              <div key={idx} className="leading-relaxed">
                 {log}
               </div>
             ))}

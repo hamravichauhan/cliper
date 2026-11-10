@@ -34,6 +34,8 @@ echo [OK] FFmpeg verified.
 :: 4. Sync Python virtual environment (Python 3.11+)
 echo [*] Syncing Python dependencies with uv...
 uv sync
+uv pip install -e .
+uv run python -c "import site, pathlib; p = pathlib.Path(site.getsitepackages()[0]) / 'kalp.pth'; p.write_text(f'{pathlib.Path.cwd()}\n{pathlib.Path.cwd()}/src\n')"
 
 :: 5. Build React Web UI
 echo [*] Building React + Vite Web UI...

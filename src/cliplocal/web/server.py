@@ -42,9 +42,13 @@ class SubmitJobRequest(BaseModel):
     language: Optional[str] = None
     use_llm: bool = False
     auto_zoom: bool = True
+    multicam: bool = True
+    top_banner: bool = True
     include_emojis: bool = True
     include_sfx: bool = True
     background_music: bool = False
+    anti_copyright: bool = False
+    broll: bool = False
 
 @app.post("/api/jobs")
 async def create_job(req: SubmitJobRequest):
@@ -87,9 +91,13 @@ class ReRenderRequest(BaseModel):
     caption_style: str = "hormozi"
     reframe_mode: str = "center"
     auto_zoom: bool = True
+    multicam: bool = True
+    top_banner: bool = True
     include_emojis: bool = True
     include_sfx: bool = True
     background_music: bool = False
+    anti_copyright: bool = False
+    broll: bool = False
 
 @app.post("/api/clips/re-render")
 async def re_render_clip(req: ReRenderRequest):
@@ -105,8 +113,8 @@ async def re_render_clip(req: ReRenderRequest):
     candidate.start = req.start
     candidate.end = req.end
     candidate.duration = req.end - req.start
-    candidate.caption_style = CaptionStyleName(req.caption_style)
-    candidate.reframe_mode = ReframeMode(req.reframe_mode)
+    candidate.caption_style = CaptionStyleName(req.caption_style) if req.caption_style in [e.value for e in CaptionStyleName] else CaptionStyleName.HORMOZI
+    candidate.reframe_mode = ReframeMode(req.reframe_mode) if req.reframe_mode in [e.value for e in ReframeMode] else ReframeMode.CENTER
 
     # Filter words if autocut deletion was applied
     if req.deleted_words and candidate.words:
@@ -121,9 +129,14 @@ async def re_render_clip(req: ReRenderRequest):
         metadata=job.metadata,
         reframe_mode=candidate.reframe_mode,
         auto_zoom=req.auto_zoom,
+        multicam=req.multicam,
+        top_banner=req.top_banner,
         include_emojis=req.include_emojis,
         include_sfx=req.include_sfx,
-        background_music=req.background_music
+        background_music=req.background_music,
+        anti_copyright=req.anti_copyright,
+        broll=req.broll,
+        extract_thumbnails=True
     )
 
     return {"output_path": str(out_file), "candidate": candidate.model_dump()}
