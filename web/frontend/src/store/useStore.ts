@@ -37,8 +37,18 @@ interface AppState {
   activeProject: Project | null
   clips: Clip[]
   selectedClipId: string | null
+  activeJobId: string | null
+  setActiveJobId: (jobId: string | null) => void
+
+  // Brand Kits
   brandKits: BrandKit[]
   activeBrandKitId: string
+  fetchBrandKits: () => Promise<void>
+  createBrandKit: (kit: Omit<BrandKit, 'id'>) => Promise<BrandKit>
+  updateBrandKit: (id: string, updates: Partial<BrandKit>) => Promise<void>
+  deleteBrandKit: (id: string) => Promise<void>
+  setActiveBrandKitId: (id: string) => void
+
   engineHealth: EngineHealth
 
   // Playback in Studio
@@ -70,6 +80,7 @@ interface AppState {
   downloadScheduleCSV: (jobId?: string) => void
   reRenderCurrentClip: (clipId: string, options: any) => Promise<boolean>
   submitNewJob: (payload: any) => Promise<string | null>
+  loadJobIntoStudio: (jobId: string) => Promise<boolean>
   fetchHealth: () => Promise<void>
 
   // Toasts
@@ -93,8 +104,114 @@ export const useStore = create<AppState>((set, get) => ({
   activeProject: mockProjects[0],
   clips: mockClips,
   selectedClipId: mockClips[0]?.id || null,
+  activeJobId: null,
+  setActiveJobId: (jobId) => set({ activeJobId: jobId }),
+
   brandKits: mockBrandKits,
   activeBrandKitId: mockBrandKits[0].id,
+
+  fetchBrandKits: async () => {
+    try {
+      const res = await fetch('/api/brand-kits')
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
+          set({ brandKits: data, activeBrandKitId: data[0].id })
+        }
+      }
+    } catch {
+      // offline fallback
+    }
+  },
+
+  createBrandKit: async (kitData) => {
+    try {
+      const res = await fetch('/api/brand-kits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(kitData)
+      })
+      if (res.ok) {
+        const newKit = await res.json()
+        set((state) => ({
+          brandKits: [newKit, ...state.brandKits],
+          activeBrandKitId: newKit.id
+        }))
+        get().addToast({
+          title: 'Brand Kit Created',
+          description: `Preset '${newKit.name}' created and saved.`,
+          type: 'success'
+        })
+        return newKit
+      }
+    } catch {
+      // fallback
+    }
+
+    const localKit: BrandKit = {
+      ...kitData,
+      id: `bk-${Math.random().toString(36).substring(2, 8)}`
+    }
+    set((state) => ({
+      brandKits: [localKit, ...state.brandKits],
+      activeBrandKitId: localKit.id
+    }))
+    get().addToast({
+      title: 'Brand Kit Saved',
+      description: `Preset '${localKit.name}' saved locally.`,
+      type: 'success'
+    })
+    return localKit
+  },
+
+  updateBrandKit: async (id, updates) => {
+    try {
+      const current = get().brandKits.find((k) => k.id === id)
+      if (current) {
+        const merged = { ...current, ...updates }
+        await fetch(`/api/brand-kits/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(merged)
+        })
+      }
+    } catch {
+      // offline fallback
+    }
+
+    set((state) => ({
+      brandKits: state.brandKits.map((k) => (k.id === id ? { ...k, ...updates } : k))
+    }))
+    get().addToast({
+      title: 'Brand Kit Updated',
+      description: 'Client settings and styling saved.',
+      type: 'success'
+    })
+  },
+
+  deleteBrandKit: async (id) => {
+    try {
+      await fetch(`/api/brand-kits/${id}`, { method: 'DELETE' })
+    } catch {
+      // offline fallback
+    }
+
+    set((state) => {
+      const remaining = state.brandKits.filter((k) => k.id !== id)
+      return {
+        brandKits: remaining,
+        activeBrandKitId: remaining[0]?.id || ''
+      }
+    })
+    get().addToast({
+      title: 'Brand Kit Deleted',
+      description: 'Preset removed from agency library.',
+      type: 'info'
+    })
+  },
+
+  setActiveBrandKitId: (id) => set({ activeBrandKitId: id }),
+
   engineHealth: mockEngineHealth,
 
   isPlaying: false,
@@ -323,6 +440,7 @@ export const useStore = create<AppState>((set, get) => ({
       })
       if (res.ok) {
         const job = await res.json()
+        set({ activeJobId: job.job_id })
         get().addToast({
           title: 'Pipeline Job Launched',
           description: `Job ${job.job_id} queued on Apple Silicon.`,
@@ -334,6 +452,96 @@ export const useStore = create<AppState>((set, get) => ({
       // fallback
     }
     return null
+  },
+
+  loadJobIntoStudio: async (jobId: string) => {
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`)
+      if (res.ok) {
+        const job = await res.json()
+        if (job.candidates && job.candidates.length > 0) {
+          const transformedClips: Clip[] = job.candidates.map((c: any, idx: number) => {
+            const streamUrl = c.video_path ? `/api/media/stream?path=${encodeURIComponent(c.video_path)}` : ''
+            const thumbUrl = c.thumbnail_path ? `/api/media/stream?path=${encodeURIComponent(c.thumbnail_path)}` : ''
+            return {
+              id: `job-${job.job_id}-clip-${c.index || idx + 1}`,
+              index: c.index || idx + 1,
+              title: c.title || c.spoken_context || `Viral Hook Clip #${c.index || idx + 1}`,
+              startTime: c.start,
+              endTime: c.end,
+              duration: c.duration,
+              viralityScore: Math.round(c.score?.total_score || 85),
+              factors: {
+                hook: Math.round(c.score?.hook_score || 88),
+                acoustics: Math.round(c.score?.acoustics_score || 85),
+                pace: Math.round(c.score?.pace_score || 82),
+                payoff: Math.round(c.score?.payoff_score || 86),
+                sentiment: Math.round(c.score?.sentiment_score || 80),
+                duration: Math.round(c.score?.duration_fit || 84)
+              },
+              status: 'pending',
+              thumbnailUrl: thumbUrl,
+              videoUrl: streamUrl,
+              words: (c.words || []).map((w: any, wIdx: number) => ({
+                id: wIdx + 1,
+                word: w.word,
+                start: w.start,
+                end: w.end
+              })),
+              fullText: c.text || '',
+              captionStyle: c.caption_style || 'hormozi',
+              copy: {
+                youtubeTitle: `${c.title || 'Must Watch'} #shorts`,
+                youtubeDescription: `${c.text}\n\nProcessed 100% offline with ClipLocal.`,
+                youtubeTags: ['#shorts', '#viral', '#podcast'],
+                instagramCaption: `${c.title || 'Mind blowing moment'} 🔥\n\nDrop your thoughts below!`,
+                hashtags: ['#shorts', '#viral', '#reels']
+              },
+              narrativeFlags: {
+                sponsorshipRisk: 0,
+                fillersScrubbed: 3,
+                silenceSnappedMs: 240
+              }
+            }
+          })
+
+          const newProject: Project = {
+            id: job.job_id,
+            title: job.metadata?.title || job.source_url_or_path.split('/').pop() || 'Untitled Project',
+            source: job.source_url_or_path,
+            sourceType: job.source_url_or_path.startsWith('http') ? 'youtube' : 'upload',
+            rightsConfirmed: true,
+            status: 'completed',
+            createdAt: new Date(job.created_at * 1000).toISOString().split('T')[0],
+            durationSec: Math.round(job.metadata?.duration || 600),
+            clipsCount: transformedClips.length,
+            avgScore: Math.round(
+              transformedClips.reduce((acc, c) => acc + c.viralityScore, 0) / transformedClips.length
+            ),
+            thumbnailUrl: transformedClips[0]?.thumbnailUrl || '',
+            clips: transformedClips
+          }
+
+          set((state) => ({
+            projects: [newProject, ...state.projects.filter((p) => p.id !== newProject.id)],
+            activeProject: newProject,
+            clips: transformedClips,
+            selectedClipId: transformedClips[0]?.id || null,
+            currentScreen: 'studio'
+          }))
+
+          get().addToast({
+            title: 'Project Loaded in Studio',
+            description: `${transformedClips.length} rendered clips loaded into Clip Review Studio.`,
+            type: 'success'
+          })
+          return true
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load job into studio', e)
+    }
+    return false
   },
 
   fetchHealth: async () => {

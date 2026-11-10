@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store/useStore'
-import { Clip, WordTimestamp } from '../types'
+import { Clip, WordTimestamp, CAPTION_STYLE_OPTIONS } from '../types'
 import { ScoreRing } from '../components/ui/ScoreRing'
 import { ScoreBar } from '../components/ui/ScoreBar'
 import { Button } from '../components/ui/Button'
@@ -634,23 +634,31 @@ export const ClipReviewStudio: React.FC = () => {
                     Caption Aesthetic Preset
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: 'hormozi', name: 'Hormozi', desc: 'Yellow pop, bold' },
-                      { id: 'mrbeast', name: 'MrBeast', desc: 'Neon cyan, energy' },
-                      { id: 'cyberpunk', name: 'Cyberpunk', desc: 'High contrast glitch' },
-                      { id: 'minimal', name: 'Minimal', desc: 'Clean white shadow' }
-                    ].map((style) => (
+                    {CAPTION_STYLE_OPTIONS.map((style) => (
                       <button
                         key={style.id}
-                        onClick={() => updateClipStyle(clip.id, style.id as any)}
+                        type="button"
+                        onClick={() => updateClipStyle(clip.id, style.id)}
                         className={`p-2.5 rounded-control border text-left transition-all ${
                           clip.captionStyle === style.id
                             ? 'bg-bg-elevated border-accent ring-1 ring-accent/30'
                             : 'bg-[#141416] border-border hover:border-[#3F3F46]'
                         }`}
                       >
-                        <p className="text-xs font-semibold text-text-primary">{style.name}</p>
-                        <p className="text-[10px] text-text-muted mt-0.5">{style.desc}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-semibold text-text-primary">{style.name}</p>
+                          <div className="flex items-center gap-1">
+                            <span
+                              className="w-2 h-2 rounded-full border border-black/40"
+                              style={{ backgroundColor: style.primaryColor }}
+                            />
+                            <span
+                              className="w-2 h-2 rounded-full border border-black/40"
+                              style={{ backgroundColor: style.highlightColor }}
+                            />
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-text-muted mt-0.5 truncate">{style.desc}</p>
                       </button>
                     ))}
                   </div>

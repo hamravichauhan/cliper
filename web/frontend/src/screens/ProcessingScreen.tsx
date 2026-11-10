@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store/useStore'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
@@ -10,46 +10,276 @@ import {
   ChevronDown,
   ChevronUp,
   Cpu,
-  Layers
+  Layers,
+  RotateCcw,
+  Sparkles,
+  AlertCircle,
+  Copy,
+  Check
 } from 'lucide-react'
 
+interface JobData {
+  job_id: string
+  created_at: number
+  source_url_or_path: string
+  status: 'queued' | 'ingesting' | 'transcribing' | 'segmenting' | 'scoring' | 'rendering' | 'completed' | 'failed' | 'cancelled'
+  progress: number
+  stage: string
+  log_messages: string[]
+  error_message?: string | null
+  metadata?: any
+  candidates?: any[]
+  timing_report?: Record<string, number>
+}
+
 export const ProcessingScreen: React.FC = () => {
-  const { setScreen, addToast } = useStore()
+  const {
+    activeJobId,
+    setActiveJobId,
+    setScreen,
+    addToast,
+    loadJobIntoStudio
+  } = useStore()
 
-  const [step, setStep] = useState(2) // 0: Audio, 1: Whisper, 2: 6-Factor, 3: VideoToolbox Render
-  const [progress, setProgress] = useState(65)
+  const [jobData, setJobData] = useState<JobData | null>(null)
   const [logExpanded, setLogExpanded] = useState(true)
+  const [copiedLogs, setCopiedLogs] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const logEndRef = useRef<HTMLDivElement>(null)
 
-  const steps = [
-    { title: 'Extract Audio & Demuxing', eta: 'Done (1.2s)', desc: '16kHz mono WAV extraction via FFmpeg' },
-    { title: 'Whisper MLX Transcription', eta: 'Done (8.4s)', desc: 'large-v3-turbo with Metal FP16 acceleration' },
-    { title: '6-Factor Virality Scoring & Context', eta: 'In Progress (ETA 4s)', desc: 'Hook, acoustics, pacing, and spoken context derivation' },
-    { title: 'Parallel VideoToolbox Render', eta: 'Pending', desc: 'Hardware ProRes/H.265 encoding with 3 parallel workers' }
-  ]
-
-  const mockLogs = [
-    '[00:00.12] cliplocal.ingest: Demuxing audio stream from hormozi_masterclass_4k.mp4...',
-    '[00:01.32] cliplocal.asr: Initializing MLX Whisper large-v3-turbo on Apple M4 GPU...',
-    '[00:05.80] cliplocal.asr: Transcription complete. 1,420 words detected. Language: English (99.8%)',
-    '[00:07.10] cliplocal.scoring: Evaluating candidate segments across 6 virality factors...',
-    '[00:08.40] cliplocal.scoring: Segment [142.0s - 184.5s] Hook score: 96, Acoustics: 91 -> Virality: 92',
-    '[00:09.10] cliplocal.context: Spoken context headline extracted: "Why 99% Of People Never Make Money"',
-    '[00:10.50] cliplocal.render: Spawning ThreadPoolExecutor(max_workers=3) with VideoToolbox hardware encoder...'
-  ]
-
-  // Simulate auto-completion after 6 seconds for smooth demo
+  // Auto-scroll logs
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setProgress(100)
-      setStep(3)
-      addToast({
-        title: 'Processing Complete!',
-        description: '5 viral clips generated and ready for review.',
-        type: 'success'
-      })
-    }, 4500)
-    return () => clearTimeout(timer)
-  }, [addToast])
+    if (logExpanded && logEndRef.current) {
+      logEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [jobData?.log_messages, logExpanded])
+
+  // Polling logic
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchJob = async (id: string) => {
+      try {
+        const res = await fetch(`/api/jobs/${id}`)
+        if (res.ok) {
+          const data: JobData = await res.json()
+          if (isMounted) {
+            setJobData(data)
+            setIsLoading(false)
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching job status:', err)
+      }
+    }
+
+    const discoverLatestJob = async () => {
+      try {
+        const res = await fetch('/api/jobs')
+        if (res.ok) {
+          const jobs: any[] = await res.json()
+          if (jobs.length > 0) {
+            // Find active running job or pick latest
+            const running = jobs.find((j) =>
+              ['queued', 'ingesting', 'transcribing', 'segmenting', 'scoring', 'rendering'].includes(j.status)
+            )
+            const targetId = running ? running.job_id : jobs[0].job_id
+            if (isMounted) {
+              setActiveJobId(targetId)
+              fetchJob(targetId)
+            }
+            return
+          }
+        }
+      } catch (err) {
+        console.error('Error discovering jobs:', err)
+      }
+      if (isMounted) setIsLoading(false)
+    }
+
+    if (activeJobId) {
+      fetchJob(activeJobId)
+    } else {
+      discoverLatestJob()
+    }
+
+    const interval = setInterval(() => {
+      const currentId = activeJobId || jobData?.job_id
+      if (currentId) {
+        fetchJob(currentId)
+      }
+    }, 1000)
+
+    return () => {
+      isMounted = false
+      clearInterval(interval)
+    }
+  }, [activeJobId, jobData?.job_id, setActiveJobId])
+
+  const handleCancelJob = async () => {
+    if (!jobData?.job_id) return
+    try {
+      const res = await fetch(`/api/jobs/${jobData.job_id}/cancel`, { method: 'POST' })
+      if (res.ok) {
+        addToast({
+          title: 'Job Cancelled',
+          description: `Pipeline execution for ${jobData.job_id} halted.`,
+          type: 'warning'
+        })
+        setJobData((prev) => (prev ? { ...prev, status: 'cancelled', stage: 'Cancelled by user' } : null))
+      }
+    } catch {
+      addToast({ title: 'Cancellation Failed', type: 'danger' })
+    }
+  }
+
+  const handleRetryJob = async () => {
+    if (!jobData?.job_id) return
+    try {
+      const res = await fetch(`/api/jobs/${jobData.job_id}/retry`, { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        setActiveJobId(data.job_id)
+        addToast({
+          title: 'Job Retried',
+          description: `New job ${data.job_id} submitted to queue.`,
+          type: 'success'
+        })
+      }
+    } catch {
+      addToast({ title: 'Retry Failed', type: 'danger' })
+    }
+  }
+
+  const handleOpenStudio = async () => {
+    if (!jobData) return
+    const success = await loadJobIntoStudio(jobData.job_id)
+    if (!success) {
+      setScreen('studio')
+    }
+  }
+
+  const handleCopyLogs = () => {
+    if (!jobData?.log_messages) return
+    navigator.clipboard.writeText(jobData.log_messages.join('\n'))
+    setCopiedLogs(true)
+    setTimeout(() => setCopiedLogs(false), 2000)
+    addToast({ title: 'Logs Copied', description: 'Terminal log copied to clipboard.', type: 'info' })
+  }
+
+  // If no job data yet
+  if (isLoading && !jobData) {
+    return (
+      <div className="max-w-[800px] mx-auto py-16 px-6 text-center space-y-4">
+        <div className="w-10 h-10 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
+        <h3 className="text-sm font-semibold text-text-primary">Connecting to Local Processing Engine...</h3>
+        <p className="text-xs text-text-muted">Reading SQLite pipeline queue on Apple Silicon.</p>
+      </div>
+    )
+  }
+
+  if (!jobData) {
+    return (
+      <div className="max-w-[800px] mx-auto py-16 px-6 text-center space-y-4 bg-bg-surface border border-border rounded-card mt-8">
+        <Layers className="w-10 h-10 text-text-muted mx-auto" />
+        <h3 className="text-sm font-semibold text-text-primary">No Active Pipeline Job</h3>
+        <p className="text-xs text-text-muted max-w-sm mx-auto">
+          There are currently no videos being processed in the pipeline queue.
+        </p>
+        <Button variant="primary" size="sm" onClick={() => setScreen('new-project')}>
+          Start New Project
+        </Button>
+      </div>
+    )
+  }
+
+  const progress = Math.min(100, Math.max(0, Math.round(jobData.progress || 0)))
+  const isFinished = jobData.status === 'completed'
+  const isFailed = jobData.status === 'failed'
+  const isCancelled = jobData.status === 'cancelled'
+  const isRunning = !isFinished && !isFailed && !isCancelled
+
+  // Dynamic ETA Calculation
+  const elapsedSec = Math.max(1, Math.round(Date.now() / 1000 - jobData.created_at))
+  let etaText = 'Calculating...'
+  if (isFinished) {
+    etaText = `Completed in ${elapsedSec}s`
+  } else if (isFailed) {
+    etaText = 'Failed'
+  } else if (isCancelled) {
+    etaText = 'Cancelled'
+  } else if (progress > 5) {
+    const remainingSec = Math.max(2, Math.round((elapsedSec / (progress / 100)) - elapsedSec))
+    if (remainingSec > 60) {
+      etaText = `~${Math.floor(remainingSec / 60)}m ${remainingSec % 60}s remaining`
+    } else {
+      etaText = `~${remainingSec}s remaining`
+    }
+  }
+
+  // Derive execution steps status dynamically from real progress and timing report
+  const steps = [
+    {
+      title: 'Source Ingestion & Audio Demuxing',
+      desc: '16kHz mono WAV extraction via FFmpeg with probe inspection',
+      isCompleted: progress >= 20 || Boolean(jobData.timing_report?.['Ingest & Probe']),
+      isCurrent: jobData.status === 'ingesting' || (progress < 20 && isRunning),
+      timeText: jobData.timing_report?.['Ingest & Probe']
+        ? `Done (${jobData.timing_report['Ingest & Probe'].toFixed(1)}s)`
+        : progress >= 20
+        ? 'Done'
+        : jobData.status === 'ingesting'
+        ? 'In Progress'
+        : 'Pending'
+    },
+    {
+      title: 'Whisper MLX Speech-to-Text',
+      desc: 'Word-level timestamp extraction with Apple Metal FP16 Whisper Turbo',
+      isCompleted: progress >= 50 || Boolean(jobData.timing_report?.['Transcription']),
+      isCurrent:
+        jobData.status === 'transcribing' ||
+        jobData.status === 'segmenting' ||
+        (progress >= 20 && progress < 50 && isRunning),
+      timeText: jobData.timing_report?.['Transcription']
+        ? `Done (${jobData.timing_report['Transcription'].toFixed(1)}s)`
+        : progress >= 50
+        ? 'Done'
+        : jobData.status === 'transcribing' || jobData.status === 'segmenting'
+        ? 'In Progress'
+        : 'Pending'
+    },
+    {
+      title: '6-Factor Virality Scoring & Spoken Context',
+      desc: 'Hook, acoustics, pacing, and thesis context headline extraction',
+      isCompleted: progress >= 70 || Boolean(jobData.timing_report?.['Scoring & Ranking']),
+      isCurrent: jobData.status === 'scoring' || (progress >= 50 && progress < 70 && isRunning),
+      timeText: jobData.timing_report?.['Scoring & Ranking']
+        ? `Done (${jobData.timing_report['Scoring & Ranking'].toFixed(1)}s)`
+        : progress >= 70
+        ? 'Done'
+        : jobData.status === 'scoring'
+        ? 'In Progress'
+        : 'Pending'
+    },
+    {
+      title: 'Parallel VideoToolbox 9:16 Render',
+      desc: 'Hardware ProRes/H.265 encoding with burned-in ASS animated subtitles',
+      isCompleted: isFinished || progress >= 100,
+      isCurrent: jobData.status === 'rendering' || (progress >= 70 && progress < 100 && isRunning),
+      timeText: jobData.timing_report?.['Rendering']
+        ? `Done (${jobData.timing_report['Rendering'].toFixed(1)}s)`
+        : isFinished || progress >= 100
+        ? 'Done'
+        : jobData.status === 'rendering'
+        ? 'In Progress'
+        : 'Pending'
+    }
+  ]
+
+  const videoTitle =
+    jobData.metadata?.title ||
+    jobData.source_url_or_path.split('/').pop() ||
+    jobData.source_url_or_path
 
   return (
     <div className="max-w-[800px] mx-auto py-8 px-6 space-y-8">
@@ -60,38 +290,77 @@ export const ProcessingScreen: React.FC = () => {
             Processing Video Pipeline
           </h2>
           <p className="text-xs text-text-secondary mt-1">
-            Job ID: <span className="font-mono text-accent">job_7a9f2c</span> • Apple M4 Hardware Acceleration
+            Job ID: <span className="font-mono text-accent">{jobData.job_id}</span> • Apple M4 Hardware Acceleration
           </p>
         </div>
 
-        <Button
-          variant="danger"
-          size="sm"
-          icon={<X className="w-3.5 h-3.5" />}
-          onClick={() => {
-            addToast({ title: 'Job Cancelled', type: 'warning' })
-            setScreen('home')
-          }}
-        >
-          Cancel Job
-        </Button>
+        <div className="flex items-center gap-2">
+          {isRunning && (
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<X className="w-3.5 h-3.5" />}
+              onClick={handleCancelJob}
+            >
+              Cancel Job
+            </Button>
+          )}
+
+          {isFailed && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RotateCcw className="w-3.5 h-3.5" />}
+              onClick={handleRetryJob}
+            >
+              Retry Job
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Main Progress Bar */}
+      {/* Failure Callout if error */}
+      {isFailed && jobData.error_message && (
+        <div className="bg-danger/10 border border-danger/30 rounded-card p-4 flex items-start gap-3 text-xs">
+          <AlertCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <h4 className="font-semibold text-danger">Pipeline Execution Failed</h4>
+            <p className="text-text-secondary mt-1 font-mono text-[11px] break-all">
+              {jobData.error_message}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Main Real Progress Bar */}
       <div className="bg-bg-surface border border-border rounded-card p-5 space-y-3">
         <div className="flex items-center justify-between text-xs">
-          <span className="font-semibold text-text-primary">Overall Pipeline Progress</span>
-          <span className="font-mono text-accent font-bold">{progress}%</span>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-text-primary">Overall Pipeline Progress</span>
+            <Badge
+              variant={isFinished ? 'accent' : isFailed ? 'danger' : isCancelled ? 'muted' : 'primary'}
+              size="sm"
+            >
+              {jobData.stage || jobData.status}
+            </Badge>
+          </div>
+          <span className="font-mono text-accent font-bold text-sm">{progress}%</span>
         </div>
-        <div className="w-full h-2 bg-[#1F1F23] rounded-full overflow-hidden">
+
+        <div className="w-full h-2.5 bg-[#1F1F23] rounded-full overflow-hidden">
           <div
-            className="h-full bg-accent rounded-full transition-all duration-500 ease-out"
+            className={`h-full rounded-full transition-all duration-300 ease-out ${
+              isFailed ? 'bg-danger' : isCancelled ? 'bg-amber-500' : 'bg-accent'
+            }`}
             style={{ width: `${progress}%` }}
           />
         </div>
+
         <div className="flex justify-between items-center text-[11px] text-text-muted pt-1">
-          <span>Target: 5 Clips (35s vertical)</span>
-          <span>ETA remaining: ~6 seconds</span>
+          <span className="truncate max-w-[400px]" title={jobData.source_url_or_path}>
+            Source: <strong className="text-text-primary">{videoTitle}</strong>
+          </span>
+          <span className="font-mono text-text-secondary">{etaText}</span>
         </div>
       </div>
 
@@ -102,53 +371,62 @@ export const ProcessingScreen: React.FC = () => {
         </h3>
 
         <div className="space-y-6">
-          {steps.map((s, idx) => {
-            const isCompleted = idx < step || progress === 100
-            const isCurrent = idx === step && progress < 100
-            const isPending = idx > step && progress < 100
-
-            return (
-              <div key={s.title} className="flex items-start gap-4">
-                <div className="mt-0.5 shrink-0">
-                  {isCompleted ? (
-                    <div className="w-6 h-6 rounded-full bg-status-success/20 text-status-success border border-status-success/40 flex items-center justify-center">
-                      <CheckCircle2 className="w-4 h-4" />
-                    </div>
-                  ) : isCurrent ? (
-                    <div className="w-6 h-6 rounded-full bg-accent/20 text-accent border border-accent/40 flex items-center justify-center animate-spin">
-                      <Cpu className="w-3.5 h-3.5" />
-                    </div>
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-[#18181B] text-text-muted border border-border flex items-center justify-center font-mono text-xs">
-                      {idx + 1}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h4
-                      className={`text-xs font-semibold ${
-                        isCompleted || isCurrent ? 'text-text-primary' : 'text-text-muted'
-                      }`}
-                    >
-                      {s.title}
-                    </h4>
-                    <span className="text-[11px] font-mono text-text-muted">{s.eta}</span>
+          {steps.map((s, idx) => (
+            <div key={s.title} className="flex items-start gap-4">
+              <div className="mt-0.5 shrink-0">
+                {s.isCompleted ? (
+                  <div className="w-6 h-6 rounded-full bg-status-success/20 text-status-success border border-status-success/40 flex items-center justify-center">
+                    <CheckCircle2 className="w-4 h-4" />
                   </div>
-                  <p className="text-[11px] text-text-secondary mt-0.5">{s.desc}</p>
-                </div>
+                ) : s.isCurrent ? (
+                  <div className="w-6 h-6 rounded-full bg-accent/20 text-accent border border-accent/40 flex items-center justify-center animate-spin">
+                    <Cpu className="w-3.5 h-3.5" />
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-[#18181B] text-text-muted border border-border flex items-center justify-center font-mono text-xs">
+                    {idx + 1}
+                  </div>
+                )}
               </div>
-            )
-          })}
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h4
+                    className={`text-xs font-semibold ${
+                      s.isCompleted || s.isCurrent ? 'text-text-primary' : 'text-text-muted'
+                    }`}
+                  >
+                    {s.title}
+                  </h4>
+                  <span
+                    className={`text-[11px] font-mono ${
+                      s.isCompleted
+                        ? 'text-status-success'
+                        : s.isCurrent
+                        ? 'text-accent font-semibold'
+                        : 'text-text-muted'
+                    }`}
+                  >
+                    {s.timeText}
+                  </span>
+                </div>
+                <p className="text-[11px] text-text-secondary mt-0.5">{s.desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {progress === 100 && (
-          <div className="pt-4 border-t border-border flex justify-end">
+        {isFinished && (
+          <div className="pt-4 border-t border-border flex items-center justify-between">
+            <span className="text-xs text-status-success font-medium flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4" />
+              All short-form clips rendered and ready for review.
+            </span>
             <Button
               variant="primary"
               size="md"
-              onClick={() => setScreen('studio')}
+              icon={<Sparkles className="w-4 h-4" />}
+              onClick={handleOpenStudio}
             >
               Open in Clip Review Studio
             </Button>
@@ -156,27 +434,48 @@ export const ProcessingScreen: React.FC = () => {
         )}
       </div>
 
-      {/* Live Mono Log Output */}
+      {/* Live Mono Log Output from Backend */}
       <div className="bg-[#09090B] border border-border rounded-card overflow-hidden">
-        <button
-          onClick={() => setLogExpanded(!logExpanded)}
-          className="w-full px-4 py-2.5 bg-[#111113] border-b border-border flex items-center justify-between text-xs text-text-secondary hover:text-text-primary"
-        >
-          <span className="flex items-center gap-2 font-mono text-[11px]">
+        <div className="w-full px-4 py-2.5 bg-[#111113] border-b border-border flex items-center justify-between text-xs text-text-secondary">
+          <button
+            onClick={() => setLogExpanded(!logExpanded)}
+            className="flex items-center gap-2 font-mono text-[11px] hover:text-text-primary"
+          >
             <Terminal className="w-3.5 h-3.5 text-accent" />
-            <span>Live Terminal Execution Log</span>
-          </span>
-          {logExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </button>
+            <span>Live Terminal Execution Log ({jobData.log_messages?.length || 0} events)</span>
+            {logExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-[10px] px-2"
+            icon={copiedLogs ? <Check className="w-3 h-3 text-status-success" /> : <Copy className="w-3 h-3" />}
+            onClick={handleCopyLogs}
+          >
+            {copiedLogs ? 'Copied' : 'Copy Log'}
+          </Button>
+        </div>
 
         {logExpanded && (
-          <div className="p-3 font-mono text-[11px] text-text-muted space-y-1 max-h-48 overflow-y-auto bg-black">
-            {mockLogs.map((log, i) => (
-              <div key={i} className="hover:text-text-secondary transition-colors">
-                {log}
+          <div className="p-3 font-mono text-[11px] text-text-muted space-y-1.5 max-h-56 overflow-y-auto bg-black select-text">
+            {jobData.log_messages && jobData.log_messages.length > 0 ? (
+              jobData.log_messages.map((log, i) => (
+                <div key={i} className="hover:text-text-secondary transition-colors leading-relaxed">
+                  <span className="text-text-muted/60 select-none mr-2">[{i + 1}]</span>
+                  {log}
+                </div>
+              ))
+            ) : (
+              <div className="text-text-muted italic">Waiting for pipeline messages...</div>
+            )}
+            {isRunning && (
+              <div className="text-accent animate-pulse font-mono flex items-center gap-1 text-[10px]">
+                <span>Pipeline active</span>
+                <span className="animate-ping">...</span>
               </div>
-            ))}
-            <div className="text-accent animate-pulse font-mono">_</div>
+            )}
+            <div ref={logEndRef} />
           </div>
         )}
       </div>

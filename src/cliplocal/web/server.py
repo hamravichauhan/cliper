@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from src.cliplocal.core.models import JobState, CaptionStyleName, ReframeMode, Word
 from src.cliplocal.web.jobs import job_manager
-from src.cliplocal.web.db import list_jobs, get_analytics_summary
+from src.cliplocal.web.db import list_jobs, get_analytics_summary, list_brand_kits, save_brand_kit, delete_brand_kit
 from src.cliplocal.render.engine import render_candidate_clip
 from src.cliplocal.render.crop import build_crop_filter
 from src.cliplocal.render.ffmpeg import run_ffmpeg_render
@@ -109,6 +109,26 @@ async def get_health():
 @app.get("/api/analytics")
 async def get_analytics():
     return get_analytics_summary()
+
+@app.get("/api/brand-kits")
+async def get_brand_kits():
+    return list_brand_kits()
+
+@app.post("/api/brand-kits")
+async def create_or_update_brand_kit(req: Request):
+    data = await req.json()
+    return save_brand_kit(data)
+
+@app.put("/api/brand-kits/{kit_id}")
+async def update_brand_kit_endpoint(kit_id: str, req: Request):
+    data = await req.json()
+    data["id"] = kit_id
+    return save_brand_kit(data)
+
+@app.delete("/api/brand-kits/{kit_id}")
+async def delete_brand_kit_endpoint(kit_id: str):
+    success = delete_brand_kit(kit_id)
+    return {"deleted": success}
 
 @app.get("/api/jobs/{job_id}")
 async def get_job_status(job_id: str):

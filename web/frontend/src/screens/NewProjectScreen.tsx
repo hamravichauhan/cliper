@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
+import { CaptionStyle, CAPTION_STYLE_OPTIONS } from '../types'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Slider } from '../components/ui/Slider'
@@ -47,8 +48,8 @@ export const NewProjectScreen: React.FC = () => {
   // Step 2: Settings
   const [clipCount, setClipCount] = useState(5)
   const [duration, setDuration] = useState(35)
-  const [selectedStyle, setSelectedStyle] = useState<'hormozi' | 'mrbeast' | 'cyberpunk' | 'minimal'>('hormozi')
-  const [selectedBrandKit, setSelectedBrandKit] = useState(brandKits[0].id)
+  const [selectedStyle, setSelectedStyle] = useState<CaptionStyle>('hormozi')
+  const [selectedBrandKit, setSelectedBrandKit] = useState(brandKits[0]?.id || '')
   const [multiCam, setMultiCam] = useState(true)
   const [faceTracking, setFaceTracking] = useState(true)
   const [sfx, setSfx] = useState(true)
@@ -467,7 +468,14 @@ export const NewProjectScreen: React.FC = () => {
                 <select
                   className="w-full bg-[#18181B] border border-border text-xs rounded-control px-3 py-2 text-text-primary outline-none focus:border-accent"
                   value={selectedBrandKit}
-                  onChange={(e) => setSelectedBrandKit(e.target.value)}
+                  onChange={(e) => {
+                    const kitId = e.target.value
+                    setSelectedBrandKit(kitId)
+                    const found = brandKits.find((b) => b.id === kitId)
+                    if (found && found.defaultStyle) {
+                      setSelectedStyle(found.defaultStyle)
+                    }
+                  }}
                 >
                   {brandKits.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -506,6 +514,53 @@ export const NewProjectScreen: React.FC = () => {
                 checked={music}
                 onChange={setMusic}
               />
+            </div>
+          </div>
+
+          {/* Visual Caption Style Selector - All 7 Presets */}
+          <div className="pt-4 border-t border-border/80 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-text-primary">
+                Burned-in Subtitle Aesthetic ({CAPTION_STYLE_OPTIONS.length} Presets)
+              </label>
+              <span className="text-[11px] text-text-muted">
+                Active Style: <strong className="text-accent">{CAPTION_STYLE_OPTIONS.find((s) => s.id === selectedStyle)?.name || selectedStyle}</strong>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              {CAPTION_STYLE_OPTIONS.map((style) => {
+                const isSelected = selectedStyle === style.id
+                return (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => setSelectedStyle(style.id)}
+                    className={`p-3 rounded-control border text-left transition-all ${
+                      isSelected
+                        ? 'bg-bg-elevated border-accent ring-1 ring-accent/30 shadow-sm'
+                        : 'bg-[#141416] border-border hover:border-[#3F3F46]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-text-primary">{style.name}</span>
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/50"
+                          style={{ backgroundColor: style.primaryColor }}
+                          title={`Primary: ${style.primaryColor}`}
+                        />
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-black/50"
+                          style={{ backgroundColor: style.highlightColor }}
+                          title={`Pop: ${style.highlightColor}`}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-text-muted line-clamp-1">{style.desc}</p>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>

@@ -43,6 +43,20 @@ def init_db():
                 state_json TEXT
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS brand_kits (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                client_name TEXT NOT NULL,
+                handle TEXT NOT NULL,
+                primary_color TEXT NOT NULL,
+                highlight_color TEXT NOT NULL,
+                font_family TEXT NOT NULL,
+                default_style TEXT NOT NULL,
+                logo_url TEXT,
+                created_at REAL NOT NULL
+            )
+        """)
         # Compound performance indexes for live dashboard filtering & search
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at DESC);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source);")
@@ -228,3 +242,131 @@ def get_analytics_summary() -> Dict[str, Any]:
             "disk_total_gb": round(disk_total / (1024**3), 1)
         }
     }
+
+def list_brand_kits() -> List[Dict[str, Any]]:
+    init_db()
+    with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM brand_kits ORDER BY created_at DESC")
+        rows = cursor.fetchall()
+        
+        # Seed default brand kits if none exist
+        if not rows:
+            default_kits = [
+                {
+                    "id": "bk-rogan",
+                    "name": "Joe Rogan Podcast",
+                    "client_name": "Joe Rogan",
+                    "handle": "@joerogan",
+                    "primary_color": "#FAFAFA",
+                    "highlight_color": "#FACC15",
+                    "font_family": "Montserrat",
+                    "default_style": "hormozi",
+                    "logo_url": None,
+                    "created_at": 1700000000.0
+                },
+                {
+                    "id": "bk-aakash",
+                    "name": "Aakash Gupta Comedy",
+                    "client_name": "Aakash Gupta",
+                    "handle": "@aakashgupta",
+                    "primary_color": "#FFFFFF",
+                    "highlight_color": "#FFE600",
+                    "font_family": "Montserrat",
+                    "default_style": "hormozi",
+                    "logo_url": None,
+                    "created_at": 1700000100.0
+                },
+                {
+                    "id": "bk-mrbeast",
+                    "name": "MrBeast Challenges",
+                    "client_name": "MrBeast",
+                    "handle": "@mrbeast",
+                    "primary_color": "#00F0FF",
+                    "highlight_color": "#FFE600",
+                    "font_family": "Inter",
+                    "default_style": "neon",
+                    "logo_url": None,
+                    "created_at": 1700000200.0
+                }
+            ]
+            for k in default_kits:
+                conn.execute("""
+                    INSERT OR REPLACE INTO brand_kits 
+                    (id, name, client_name, handle, primary_color, highlight_color, font_family, default_style, logo_url, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    k["id"], k["name"], k["client_name"], k["handle"],
+                    k["primary_color"], k["highlight_color"], k["font_family"],
+                    k["default_style"], k["logo_url"], k["created_at"]
+                ))
+            conn.commit()
+            cursor.execute("SELECT * FROM brand_kits ORDER BY created_at DESC")
+            rows = cursor.fetchall()
+
+        return [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "clientName": r["client_name"],
+                "handle": r["handle"],
+                "primaryColor": r["primary_color"],
+                "highlightColor": r["highlight_color"],
+                "fontFamily": r["font_family"],
+                "defaultStyle": r["default_style"],
+                "logoUrl": r["logo_url"]
+            }
+            for r in rows
+        ]
+
+def save_brand_kit(kit: Dict[str, Any]) -> Dict[str, Any]:
+    import time
+    init_db()
+    kit_id = kit.get("id") or f"bk-{os.urandom(4).hex()}"
+    created_at = kit.get("createdAt") or kit.get("created_at") or time.time()
+    with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
+        conn.execute("""
+            INSERT INTO brand_kits (id, name, client_name, handle, primary_color, highlight_color, font_family, default_style, logo_url, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name=excluded.name,
+                client_name=excluded.client_name,
+                handle=excluded.handle,
+                primary_color=excluded.primary_color,
+                highlight_color=excluded.highlight_color,
+                font_family=excluded.font_family,
+                default_style=excluded.default_style,
+                logo_url=excluded.logo_url
+        """, (
+            kit_id,
+            kit.get("name", "Untitled Brand Kit"),
+            kit.get("clientName", kit.get("client_name", "Creator")),
+            kit.get("handle", "@creator"),
+            kit.get("primaryColor", kit.get("primary_color", "#FFFFFF")),
+            kit.get("highlightColor", kit.get("highlight_color", "#A3E635")),
+            kit.get("fontFamily", kit.get("font_family", "Inter")),
+            kit.get("defaultStyle", kit.get("default_style", "hormozi")),
+            kit.get("logoUrl", kit.get("logo_url")),
+            created_at
+        ))
+        conn.commit()
+    return {
+        "id": kit_id,
+        "name": kit.get("name", "Untitled Brand Kit"),
+        "clientName": kit.get("clientName", kit.get("client_name", "Creator")),
+        "handle": kit.get("handle", "@creator"),
+        "primaryColor": kit.get("primaryColor", kit.get("primary_color", "#FFFFFF")),
+        "highlightColor": kit.get("highlightColor", kit.get("highlight_color", "#A3E635")),
+        "fontFamily": kit.get("fontFamily", kit.get("font_family", "Inter")),
+        "defaultStyle": kit.get("defaultStyle", kit.get("default_style", "hormozi")),
+        "logoUrl": kit.get("logoUrl", kit.get("logo_url"))
+    }
+
+def delete_brand_kit(kit_id: str) -> bool:
+    init_db()
+    with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM brand_kits WHERE id = ?", (kit_id,))
+        conn.commit()
+        return cursor.rowcount > 0
