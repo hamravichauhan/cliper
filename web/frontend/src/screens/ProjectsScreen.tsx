@@ -19,7 +19,14 @@ import {
 } from 'lucide-react'
 
 export const ProjectsScreen: React.FC = () => {
-  const { projects, selectProject, setScreen, addToast } = useStore()
+  const {
+    projects,
+    selectProject,
+    setScreen,
+    addToast,
+    downloadDeliveryBundle,
+    downloadScheduleCSV
+  } = useStore()
   const [filter, setFilter] = useState<'all' | 'processing' | 'completed' | 'failed'>('all')
   const [search, setSearch] = useState('')
   const [deleteModalProject, setDeleteModalProject] = useState<string | null>(null)
@@ -136,26 +143,14 @@ export const ProjectsScreen: React.FC = () => {
                         Open Studio
                       </Button>
                       <button
-                        onClick={() =>
-                          addToast({
-                            title: 'Delivery ZIP Packaging',
-                            description: `Downloading full agency bundle for ${p.title}`,
-                            type: 'success'
-                          })
-                        }
+                        onClick={() => downloadDeliveryBundle(p.id)}
                         className="p-1.5 text-text-muted hover:text-text-primary hover:bg-[#18181B] rounded transition-colors"
                         title="Download Delivery ZIP"
                       >
                         <FileArchive className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() =>
-                          addToast({
-                            title: 'Schedule CSV Exported',
-                            description: 'Compatible with Meta Business Suite & Buffer',
-                            type: 'success'
-                          })
-                        }
+                        onClick={() => downloadScheduleCSV(p.id)}
                         className="p-1.5 text-text-muted hover:text-text-primary hover:bg-[#18181B] rounded transition-colors"
                         title="Download Schedule CSV"
                       >

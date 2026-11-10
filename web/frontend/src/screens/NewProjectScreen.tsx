@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 
 export const NewProjectScreen: React.FC = () => {
-  const { setScreen, brandKits, addToast } = useStore()
+  const { setScreen, brandKits, addToast, submitNewJob } = useStore()
 
   // Step 1: Source
   const [sourceTab, setSourceTab] = useState<'upload' | 'youtube' | 'channel'>('upload')
@@ -37,7 +37,7 @@ export const NewProjectScreen: React.FC = () => {
   const [sfx, setSfx] = useState(true)
   const [music, setMusic] = useState(false)
 
-  const handleStartProcessing = () => {
+  const handleStartProcessing = async () => {
     if (!rightsConfirmed) {
       addToast({
         title: 'Rights Confirmation Required',
@@ -46,6 +46,26 @@ export const NewProjectScreen: React.FC = () => {
       })
       return
     }
+
+    const source = sourceTab === 'upload' ? (uploadedFile || 'sample.mp4') : (youtubeUrl || 'https://youtu.be/sample')
+    await submitNewJob({
+      source,
+      clips: clipCount,
+      style: selectedStyle,
+      mode: faceTracking ? 'auto' : 'center',
+      min_duration: Math.max(15, duration - 10),
+      max_duration: Math.min(60, duration + 10),
+      backend: 'mlx',
+      use_llm: true,
+      auto_zoom: true,
+      multicam: multiCam,
+      top_banner: true,
+      include_emojis: true,
+      include_sfx: sfx,
+      background_music: music,
+      anti_copyright: true
+    })
+
     setScreen('processing')
   }
 

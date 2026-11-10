@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 
 export const ScheduleScreen: React.FC = () => {
-  const { clips, addToast } = useStore()
+  const { clips, addToast, downloadScheduleCSV } = useStore()
   const [postsPerDay, setPostsPerDay] = useState(2)
   const [generated, setGenerated] = useState(true)
 
@@ -26,11 +26,7 @@ export const ScheduleScreen: React.FC = () => {
   }))
 
   const handleExportCSV = () => {
-    addToast({
-      title: 'Schedule CSV Exported',
-      description: '30-day posting plan formatted for Buffer, Hootsuite & Meta Business Suite.',
-      type: 'success'
-    })
+    downloadScheduleCSV()
   }
 
   return (

@@ -59,7 +59,9 @@ export const ClipReviewStudio: React.FC = () => {
     setShortcutsModalOpen,
     bulkExportApproved,
     addToast,
-    brandKits
+    brandKits,
+    reRenderCurrentClip,
+    downloadDeliveryBundle
   } = useStore()
 
   // Find active clip
@@ -342,6 +344,15 @@ export const ClipReviewStudio: React.FC = () => {
                 onClick={() => setClipStatus(clip.id, 'rejected')}
               >
                 Reject (R)
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<RotateCw className="w-3.5 h-3.5" />}
+                onClick={() => reRenderCurrentClip(clip.id, {})}
+                title="Re-render with Apple VideoToolbox"
+              >
+                Re-render
               </Button>
             </div>
           </div>
@@ -712,19 +723,18 @@ export const ClipReviewStudio: React.FC = () => {
                 />
 
                 <Button
-                  variant="secondary"
+                  variant="primary"
                   size="sm"
                   className="w-full mt-2"
-                  icon={<Sparkles className="w-3.5 h-3.5 text-accent" />}
+                  icon={<Sparkles className="w-3.5 h-3.5" />}
                   onClick={() =>
-                    addToast({
-                      title: 'Styles Saved',
-                      description: 'Clip subtitle styles updated.',
-                      type: 'success'
+                    reRenderCurrentClip(clip.id, {
+                      title: clip.title,
+                      caption_style: clip.captionStyle
                     })
                   }
                 >
-                  Save Caption Settings
+                  Apply & Re-render Video
                 </Button>
               </div>
             )}
@@ -839,6 +849,30 @@ export const ClipReviewStudio: React.FC = () => {
                   checked={true}
                   onChange={() => {}}
                 />
+
+                <div className="pt-2 border-t border-border space-y-3">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                    Transformative Engine Features
+                  </span>
+                  <Toggle
+                    label="Anti-Copyright Audio Shift (1.025x)"
+                    description="Subtle tempo & EQ shift to evade false-positive bot flags."
+                    checked={true}
+                    onChange={() => {}}
+                  />
+                  <Toggle
+                    label="Multi-Cam Active Speaker Auto-Cut"
+                    description="Switches camera framing dynamically on speaker switch."
+                    checked={true}
+                    onChange={() => {}}
+                  />
+                  <Toggle
+                    label="Dynamic Smart Zoom Punch-ins"
+                    description="Adds subtle scale punch-ins on high-emotion phrases."
+                    checked={true}
+                    onChange={() => {}}
+                  />
+                </div>
               </div>
             )}
           </div>
