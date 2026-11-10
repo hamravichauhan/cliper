@@ -1,6 +1,8 @@
 import os
 import sqlite3
 import json
+import re
+import urllib.parse
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from src.cliplocal.config.settings import config
@@ -122,6 +124,53 @@ def delete_job(job_id: str) -> bool:
         conn.commit()
         return cursor.rowcount > 0
 
+def resolve_job_title(meta: dict, source: str, candidates: list) -> str:
+    title = meta.get("title")
+    if not title or title.startswith("watch?v=") or "youtube.com" in title or "youtu.be" in title:
+        file_path = meta.get("file_path") or ""
+        if file_path:
+            stem = Path(file_path).stem
+            stem = re.sub(r'^[0-9a-f]{16}_', '', stem)
+            title = stem
+    if not title or title.startswith("watch?v="):
+        if candidates and candidates[0].get("title"):
+            title = candidates[0]["title"]
+    if not title or title.startswith("watch?v="):
+        if "v=" in source:
+            vid = source.split("v=")[1].split("&")[0][:11]
+            title = f"YouTube Video ({vid})"
+        elif "youtu.be/" in source:
+            vid = source.split("youtu.be/")[1].split("?")[0][:11]
+            title = f"YouTube Video ({vid})"
+        else:
+            title = Path(source).stem or "Untitled Project"
+    return title
+
+def resolve_job_thumbnail(meta: dict, candidates: list) -> Optional[str]:
+    for c in candidates:
+        thumbs = c.get("thumbnails") or []
+        for t in thumbs:
+            if t and Path(t).exists():
+                return t
+        if c.get("thumbnail_path") and Path(c["thumbnail_path"]).exists():
+            return c["thumbnail_path"]
+    for c in candidates:
+        out = c.get("output_path") or c.get("video_path")
+        if out:
+            p = Path(out).parent
+            jpgs = sorted(p.glob("*thumb*.jpg"))
+            if jpgs:
+                return str(jpgs[0])
+    file_path = meta.get("file_path")
+    if file_path:
+        stem = Path(file_path).stem
+        for p in Path("output").glob(f"*{stem}*"):
+            if p.is_dir():
+                jpgs = sorted(p.glob("*thumb*.jpg"))
+                if jpgs:
+                    return str(jpgs[0])
+    return None
+
 def list_jobs() -> List[Dict[str, Any]]:
     init_db()
     with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
@@ -137,7 +186,9 @@ def list_jobs() -> List[Dict[str, Any]]:
             scores = [c.get("score", {}).get("total_score", 0.0) for c in candidates if c.get("score")]
             avg_score = round(sum(scores) / len(scores), 1) if scores else 0.0
             meta = st.get("metadata") or {}
-            title = meta.get("title") or Path(r["source"]).stem or "Untitled Video"
+            title = resolve_job_title(meta, r["source"], candidates)
+            thumb = resolve_job_thumbnail(meta, candidates)
+            thumb_url = f"/api/media/stream?path={urllib.parse.quote(thumb)}" if thumb else None
 
             jobs.append({
                 "job_id": r["job_id"],
@@ -147,9 +198,10 @@ def list_jobs() -> List[Dict[str, Any]]:
                 "stage": r["stage"],
                 "source": r["source"],
                 "title": title,
+                "thumbnail_url": thumb_url,
                 "duration": meta.get("duration", 0.0),
                 "clip_count": len(candidates),
-                "avg_virality_score": avg_score,
+                "avg_virality_score": avg_score if len(candidates) > 0 else 0.0,
                 "error_message": st.get("error_message"),
                 "timing_report": st.get("timing_report") or {},
                 "style": opts.get("style", "hormozi"),

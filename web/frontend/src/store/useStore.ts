@@ -145,14 +145,10 @@ export const useStore = create<AppState>((set, get) => ({
         const jobs = await res.json()
         if (Array.isArray(jobs) && jobs.length > 0) {
           const mappedProjects: Project[] = jobs.map((j: any) => {
-            let cleanTitle = j.title || j.source || 'Untitled Harvest'
-            if (cleanTitle.startsWith('watch?v=') && j.source) {
-              const videoId = j.source.split('v=')[1]?.substring(0, 11)
-              cleanTitle = videoId ? `Video (${videoId})` : cleanTitle
-            }
+            const displayTitle = j.title || j.source || 'Untitled Harvest'
             return {
               id: j.job_id,
-              title: cleanTitle,
+              title: displayTitle,
               source: j.source || j.source_url_or_path || '',
               sourceType: ((j.source || '').startsWith('http') ? 'youtube' : 'upload') as any,
               rightsConfirmed: true,
@@ -160,14 +156,13 @@ export const useStore = create<AppState>((set, get) => ({
               createdAt: new Date((j.created_at || Date.now() / 1000) * 1000).toISOString().split('T')[0],
               durationSec: Math.round(j.duration || 600),
               clipsCount: j.clip_count || (j.candidates ? j.candidates.length : 0),
-              avgScore: Math.round(j.avg_virality_score || 80),
-              thumbnailUrl: '',
+              avgScore: (j.clip_count > 0 && j.avg_virality_score > 0) ? Math.round(j.avg_virality_score) : 0,
+              thumbnailUrl: j.thumbnail_url || '',
               clips: []
             }
           })
 
           set((state) => {
-            // Keep any active project details or fallback
             return {
               projects: mappedProjects
             }
@@ -562,7 +557,7 @@ export const useStore = create<AppState>((set, get) => ({
             const videoPath = c.output_path || c.video_path || ''
             const streamUrl = videoPath ? `/api/media/stream?path=${encodeURIComponent(videoPath)}` : ''
             const thumbPath = (c.thumbnails && c.thumbnails.length > 0 ? c.thumbnails[0] : null) || c.thumbnail_path || ''
-            const thumbUrl = thumbPath ? `/api/media/stream?path=${encodeURIComponent(thumbPath)}` : ''
+            const thumbUrl = thumbPath ? `/api/media/stream?path=${encodeURIComponent(thumbPath)}` : (job.thumbnail_url || '')
 
             return {
               id: c.clip_id || `job-${job.job_id}-clip-${c.index || idx + 1}`,

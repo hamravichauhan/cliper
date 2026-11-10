@@ -2,21 +2,17 @@ import React, { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
-import { Input } from '../components/ui/Input'
 import { Modal } from '../components/ui/Modal'
 import {
   Search,
-  Filter,
-  ArrowUpDown,
-  Download,
-  Calendar,
-  RotateCcw,
-  Trash2,
-  ExternalLink,
   PlusCircle,
   FileSpreadsheet,
   FileArchive,
-  RefreshCw
+  Trash2,
+  RefreshCw,
+  Video,
+  Loader2,
+  Sparkles
 } from 'lucide-react'
 
 export const ProjectsScreen: React.FC = () => {
@@ -24,6 +20,7 @@ export const ProjectsScreen: React.FC = () => {
     projects,
     selectProject,
     setScreen,
+    setActiveJobId,
     addToast,
     downloadDeliveryBundle,
     downloadScheduleCSV,
@@ -36,11 +33,17 @@ export const ProjectsScreen: React.FC = () => {
 
   useEffect(() => {
     fetchProjects()
+    const timer = setInterval(() => {
+      fetchProjects()
+    }, 4000)
+    return () => clearInterval(timer)
   }, [fetchProjects])
 
   const filtered = projects.filter((p) => {
     const matchesFilter = filter === 'all' ? true : p.status === filter
-    const matchesSearch = p.title.toLowerCase().includes(search.toLowerCase()) || p.source.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch =
+      p.title.toLowerCase().includes(search.toLowerCase()) ||
+      p.source.toLowerCase().includes(search.toLowerCase())
     return matchesFilter && matchesSearch
   })
 
@@ -57,14 +60,25 @@ export const ProjectsScreen: React.FC = () => {
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          icon={<PlusCircle className="w-3.5 h-3.5" />}
-          onClick={() => setScreen('new-project')}
-        >
-          New Project
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<RefreshCw className="w-3.5 h-3.5" />}
+            onClick={() => fetchProjects()}
+            title="Refresh database"
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<PlusCircle className="w-3.5 h-3.5" />}
+            onClick={() => setScreen('new-project')}
+          >
+            New Project
+          </Button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -115,65 +129,120 @@ export const ProjectsScreen: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
-              {filtered.map((p) => (
-                <tr key={p.id} className="hover:bg-bg-elevated/40 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-control bg-black overflow-hidden border border-border shrink-0">
-                        <img src={p.thumbnailUrl} alt={p.title} className="w-full h-full object-cover" />
-                      </div>
-                      <span className="font-semibold text-text-primary truncate max-w-xs">{p.title}</span>
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 font-mono text-[11px] text-text-muted truncate max-w-[160px]">
-                    {p.source}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    {p.status === 'completed' && <Badge variant="success">Completed</Badge>}
-                    {p.status === 'processing' && <Badge variant="warning">Processing</Badge>}
-                    {p.status === 'failed' && <Badge variant="danger">Failed</Badge>}
-                  </td>
-                  <td className="py-3.5 px-4 font-mono text-text-primary">{p.clipsCount}</td>
-                  <td className="py-3.5 px-4 font-mono text-accent font-semibold">
-                    {p.avgScore > 0 ? `${p.avgScore}/100` : '—'}
-                  </td>
-                  <td className="py-3.5 px-4 text-text-muted">
-                    {new Date(p.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <div className="inline-flex items-center gap-1.5">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => selectProject(p.id)}
-                      >
-                        Open Studio
-                      </Button>
-                      <button
-                        onClick={() => downloadDeliveryBundle(p.id)}
-                        className="p-1.5 text-text-muted hover:text-text-primary hover:bg-[#18181B] rounded transition-colors"
-                        title="Download Delivery ZIP"
-                      >
-                        <FileArchive className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => downloadScheduleCSV(p.id)}
-                        className="p-1.5 text-text-muted hover:text-text-primary hover:bg-[#18181B] rounded transition-colors"
-                        title="Download Schedule CSV"
-                      >
-                        <FileSpreadsheet className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteModalProject(p.id)}
-                        className="p-1.5 text-text-muted hover:text-status-danger hover:bg-status-danger/10 rounded transition-colors"
-                        title="Delete project"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-text-muted">
+                    No projects match the current filter.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filtered.map((p) => (
+                  <tr key={p.id} className="hover:bg-bg-elevated/40 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-control bg-[#18181B] overflow-hidden border border-border shrink-0 flex items-center justify-center">
+                          {p.thumbnailUrl ? (
+                            <img
+                              src={p.thumbnailUrl}
+                              alt=""
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none'
+                              }}
+                            />
+                          ) : (
+                            <Video className="w-4 h-4 text-accent/80" />
+                          )}
+                        </div>
+                        <span
+                          className="font-semibold text-text-primary truncate max-w-xs block"
+                          title={p.title}
+                        >
+                          {p.title}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-[11px] text-text-muted truncate max-w-[160px]">
+                      {p.source}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      {p.status === 'completed' && <Badge variant="success">Completed</Badge>}
+                      {p.status === 'processing' && <Badge variant="warning">Processing</Badge>}
+                      {p.status === 'failed' && <Badge variant="danger">Failed</Badge>}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-text-primary">{p.clipsCount}</td>
+                    <td className="py-3.5 px-4 font-mono font-semibold">
+                      {p.status === 'completed' && p.clipsCount > 0 && p.avgScore > 0 ? (
+                        <span className="text-accent">{p.avgScore}/100</span>
+                      ) : (
+                        <span className="text-text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 text-text-muted">
+                      {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="inline-flex items-center gap-1.5">
+                        {p.status === 'completed' && p.clipsCount > 0 ? (
+                          <>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => selectProject(p.id)}
+                            >
+                              Open Studio
+                            </Button>
+                            <button
+                              onClick={() => downloadDeliveryBundle(p.id)}
+                              className="p-1.5 text-text-muted hover:text-text-primary hover:bg-[#18181B] rounded transition-colors"
+                              title="Download Delivery ZIP"
+                            >
+                              <FileArchive className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => downloadScheduleCSV(p.id)}
+                              className="p-1.5 text-text-muted hover:text-text-primary hover:bg-[#18181B] rounded transition-colors"
+                              title="Download Schedule CSV"
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : p.status === 'processing' ? (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="text-accent border-accent/40"
+                            icon={<Loader2 className="w-3 h-3 animate-spin" />}
+                            onClick={() => {
+                              setActiveJobId(p.id)
+                              setScreen('processing')
+                            }}
+                          >
+                            View Progress
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="text-text-muted"
+                            onClick={() => selectProject(p.id)}
+                          >
+                            Inspect
+                          </Button>
+                        )}
+
+                        <button
+                          onClick={() => setDeleteModalProject(p.id)}
+                          className="p-1.5 text-text-muted hover:text-status-danger hover:bg-status-danger/10 rounded transition-colors ml-1"
+                          title="Delete project"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
