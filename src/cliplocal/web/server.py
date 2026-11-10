@@ -181,6 +181,12 @@ class ReRenderRequest(BaseModel):
     retention_bar: bool = False
     semantic_highlighting: bool = True
     pattern_zoom: bool = True
+    strip_fillers: bool = True
+    hook_stinger: bool = True
+    hook_stinger_type: str = "whoosh"
+    hook_snap_zoom: bool = True
+    teaser_stitch: bool = False
+    hook_headline: Optional[str] = None
 
 @app.post("/api/clips/re-render")
 def re_render_clip(req: ReRenderRequest):
@@ -228,7 +234,13 @@ def re_render_clip(req: ReRenderRequest):
         watermark=req.watermark,
         retention_bar=req.retention_bar,
         semantic_highlighting=req.semantic_highlighting,
-        pattern_zoom=req.pattern_zoom
+        pattern_zoom=req.pattern_zoom,
+        strip_fillers=req.strip_fillers,
+        hook_stinger=req.hook_stinger,
+        hook_stinger_type=req.hook_stinger_type,
+        hook_snap_zoom=req.hook_snap_zoom,
+        teaser_stitch=req.teaser_stitch,
+        hook_headline=req.hook_headline
     )
 
     return {"output_path": str(out_file), "candidate": candidate.model_dump()}

@@ -1,5 +1,6 @@
 import re
 from typing import Tuple, Optional, List, Dict, Any
+from src.cliplocal.core.models import Word, Sentence
 
 HOOK_PATTERNS: List[Dict[str, Any]] = [
     {
@@ -84,3 +85,89 @@ def score_hook(first_sentence_text: str) -> Tuple[float, Optional[str], Optional
     # Scale 0-35 boost to 0-100 range
     normalized = min(100.0, (best_score / 35.0) * 100.0) if best_score > 0 else 15.0
     return normalized, best_type, best_reason
+
+FILLER_SET = {
+    "um", "uh", "uhm", "er", "ah", "yeah", "yep", "so", "like",
+    "well", "right", "okay", "alright", "basically", "actually", "i mean"
+}
+
+def strip_leading_fillers(
+    words: List[Word],
+    clip_start: float,
+    min_remaining_duration: float = 12.0
+) -> Tuple[float, List[Word]]:
+    """
+    Remove leading filler words and pre-roll pauses from clip opening.
+    Snaps clip start directly to ~40ms before the first meaningful syllable.
+    """
+    if not words or len(words) < 3:
+        return clip_start, words
+
+    orig_end = words[-1].end
+    idx = 0
+    while idx < len(words) - 1:
+        clean = re.sub(r"[^a-zA-Z]", "", words[idx].word.lower())
+        if clean in FILLER_SET:
+            idx += 1
+        else:
+            break
+
+    if idx > 0 and idx < len(words):
+        target_word = words[idx]
+        new_start = max(clip_start, round(target_word.start - 0.04, 3))
+        # Ensure we still preserve sufficient duration
+        if (orig_end - new_start) >= min_remaining_duration:
+            return new_start, words[idx:]
+
+    return clip_start, words
+
+def find_climax_teaser_sentence(sentences: List[Sentence]) -> Optional[Sentence]:
+    """
+    Identify the peak climax sentence in a multi-sentence clip (excluding opening sentence)
+    to stitch as a 2-second teaser hook.
+    """
+    if not sentences or len(sentences) < 3:
+        return None
+
+    best_sentence: Optional[Sentence] = None
+    best_climax_score = 0.0
+
+    # Look through sentences after the opening
+    for s in sentences[1:]:
+        dur = s.end - s.start
+        # Teaser sentence must be concise (1.2s to 4.5s)
+        if dur < 1.0 or dur > 5.0:
+            continue
+
+        score, h_type, _ = score_hook(s.text)
+        
+        # Additional bonus for numbers, emotional drama, or exclamation
+        text_lower = s.text.lower()
+        if re.search(r"\b(never|always|everything|died|killed|crazy|million|billion|thousand|dollar|money|mistake|secret|danger|truth|jail|arrested)\b|\d+", text_lower):
+            score += 25.0
+        if "!" in s.text:
+            score += 15.0
+
+        if score > best_climax_score and score >= 35.0:
+            best_climax_score = score
+            best_sentence = s
+
+    return best_sentence
+
+def generate_hook_headline(candidate_title: str = "", hook_type: str = "") -> List[str]:
+    """Generate curated viral hook headline presets for top banner."""
+    base_presets = [
+        "🚨 WAIT TILL THE END",
+        "⚠️ THE BIGGEST MISTAKE",
+        "🤫 NOBODY TALKS ABOUT THIS",
+        "💡 WATCH THIS BEFORE YOU START",
+        "🔥 99% OF PEOPLE FAIL THIS",
+        "❌ STOP DOING THIS RIGHT NOW"
+    ]
+    if hook_type == "Shocking Confession":
+        return ["🚨 I ALMOST LOST EVERYTHING", "🤫 WHAT ACTUALLY HAPPENED"] + base_presets[:4]
+    elif hook_type == "Contrarian Take":
+        return ["❌ EVERYTHING YOU WERE TOLD IS A LIE", "⚠️ UNPOPULAR TRUTH"] + base_presets[:4]
+    elif hook_type == "Actionable Advice":
+        return ["💡 THE SECRET NOBODY SHARES", "🔥 DO THIS INSTEAD"] + base_presets[:4]
+    return base_presets

@@ -16,6 +16,9 @@ def ensure_sfx_assets() -> Dict[str, Path]:
     pop_path = SFX_DIR / "pop.wav"
     ding_path = SFX_DIR / "ding.wav"
     whoosh_path = SFX_DIR / "whoosh.wav"
+    sub_drop_path = SFX_DIR / "sub_drop.wav"
+    vinyl_path = SFX_DIR / "vinyl.wav"
+    shutter_path = SFX_DIR / "shutter.wav"
 
     if not pop_path.exists():
         t = np.linspace(0, 0.075, int(sr * 0.075), endpoint=False)
@@ -40,10 +43,38 @@ def ensure_sfx_assets() -> Dict[str, Path]:
         sfx = (np.sin(phase) * 0.35 + noise) * env
         wav.write(whoosh_path, sr, (sfx * 32767).astype(np.int16))
 
+    if not sub_drop_path.exists():
+        t = np.linspace(0, 0.450, int(sr * 0.450), endpoint=False)
+        f = 110 * np.exp(-t * 9)
+        phase = 2 * np.pi * np.cumsum(f) / sr
+        env = np.exp(-t * 8)
+        sfx = (np.sin(phase) * 0.9 * env).astype(np.float32)
+        wav.write(sub_drop_path, sr, (sfx * 32767).astype(np.int16))
+
+    if not vinyl_path.exists():
+        t = np.linspace(0, 0.220, int(sr * 0.220), endpoint=False)
+        f = 1200 * np.exp(-t * 25)
+        noise = np.random.uniform(-0.15, 0.15, len(t))
+        phase = 2 * np.pi * np.cumsum(f) / sr
+        env = np.sin(np.pi * (t / 0.220)) * np.exp(-t * 12)
+        sfx = ((np.sin(phase) * 0.4 + noise * 0.6) * env).astype(np.float32)
+        wav.write(vinyl_path, sr, (sfx * 32767).astype(np.int16))
+
+    if not shutter_path.exists():
+        t = np.linspace(0, 0.120, int(sr * 0.120), endpoint=False)
+        click1 = np.exp(-t * 80) * np.sin(2 * np.pi * 3200 * t)
+        t2 = np.maximum(0, t - 0.045)
+        click2 = np.exp(-t2 * 90) * np.sin(2 * np.pi * 2400 * t2) * (t >= 0.045)
+        sfx = (click1 * 0.6 + click2 * 0.8).astype(np.float32)
+        wav.write(shutter_path, sr, (sfx * 32767).astype(np.int16))
+
     return {
         "pop": pop_path,
         "ding": ding_path,
-        "whoosh": whoosh_path
+        "whoosh": whoosh_path,
+        "sub_drop": sub_drop_path,
+        "vinyl": vinyl_path,
+        "shutter": shutter_path
     }
 
 def find_sfx_trigger_points(

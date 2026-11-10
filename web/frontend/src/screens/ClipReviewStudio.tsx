@@ -88,6 +88,20 @@ export const ClipReviewStudio: React.FC = () => {
   const [kineticSfx, setKineticSfx] = useState(true)
   const [isPolishReRendering, setIsPolishReRendering] = useState(false)
 
+  // Hook Mastery State
+  const [stripFillers, setStripFillers] = useState(true)
+  const [hookStinger, setHookStinger] = useState(true)
+  const [hookStingerType, setHookStingerType] = useState<'whoosh' | 'sub_drop' | 'vinyl' | 'shutter'>('whoosh')
+  const [hookSnapZoom, setHookSnapZoom] = useState(true)
+  const [teaserStitch, setTeaserStitch] = useState(false)
+  const [hookHeadline, setHookHeadline] = useState(clip?.title || '')
+
+  useEffect(() => {
+    if (clip?.title) {
+      setHookHeadline(clip.title)
+    }
+  }, [clip?.id, clip?.title])
+
   // Audio & Song overlay state
   const [clipMuteOriginal, setClipMuteOriginal] = useState(false)
   const [clipAddSong, setClipAddSong] = useState(false)
@@ -129,11 +143,17 @@ export const ClipReviewStudio: React.FC = () => {
       semantic_highlighting: semanticHighlight,
       pattern_zoom: patternZoom,
       include_sfx: kineticSfx,
+      strip_fillers: stripFillers,
+      hook_stinger: hookStinger,
+      hook_stinger_type: hookStingerType,
+      hook_snap_zoom: hookSnapZoom,
+      teaser_stitch: teaserStitch,
+      hook_headline: hookHeadline,
       background_music: clipAddSong,
       mute_original: clipMuteOriginal,
       music_track: clipSong,
       music_volume: clipSongVolume / 100.0,
-      top_banner: topBanner,
+      top_banner: Boolean(hookHeadline),
       reframe_mode: reframeMode,
       auto_zoom: autoZoom,
       multicam: multiCam
@@ -437,7 +457,9 @@ export const ClipReviewStudio: React.FC = () => {
                   ref={videoRef}
                   src={clip.videoUrl}
                   poster={clip.thumbnailUrl}
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full object-cover transition-transform duration-300 ${
+                    hookSnapZoom && currentTime < 2.2 ? 'scale-[1.22] origin-center' : 'scale-100'
+                  }`}
                   playsInline
                   muted={isMuted}
                   loop
@@ -461,6 +483,26 @@ export const ClipReviewStudio: React.FC = () => {
                   {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}
                 </div>
               </button>
+
+              {/* Live Hook Top Headline Banner on Mobile Canvas */}
+              {hookHeadline && (
+                <div className="absolute top-4 left-3 right-3 z-20 pointer-events-none transition-opacity duration-300">
+                  <div className="bg-black/85 backdrop-blur-md border border-white/20 rounded-md py-1.5 px-3 text-center shadow-2xl">
+                    <span className="text-[10px] font-black tracking-wide text-white font-sans uppercase drop-shadow-md">
+                      {hookHeadline}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* 0.0s Stinger Transient Pulse Indicator */}
+              {hookStinger && currentTime < 0.7 && (
+                <div className="absolute top-14 right-3 z-20 pointer-events-none animate-pulse">
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-accent/90 text-black font-bold uppercase shadow-lg">
+                    ⚡ {hookStingerType}
+                  </span>
+                </div>
+              )}
 
               {/* Live Retention Progress Bar on Mobile Canvas */}
               {retentionBar && (
@@ -680,7 +722,7 @@ export const ClipReviewStudio: React.FC = () => {
             <Tabs
               tabs={[
                 { id: 'details', label: 'Details' },
-                { id: 'polish', label: 'Viral Polish' },
+                { id: 'polish', label: 'Hook & Polish' },
                 { id: 'captions', label: 'Captions' },
                 { id: 'audio', label: 'Audio' },
                 { id: 'pipeline', label: 'AI Reframing' },
@@ -758,22 +800,158 @@ export const ClipReviewStudio: React.FC = () => {
               </div>
             )}
 
-            {/* TAB: POST-GENERATION VIRAL POLISH */}
+            {/* TAB: HOOK & VIRAL POLISH */}
             {inspectorTab === 'polish' && (
               <div className="space-y-4">
                 <div className="bg-[#18181B] border border-border rounded-card p-3 space-y-1">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-accent" />
+                    <Zap className="w-4 h-4 text-accent" />
                     <h4 className="text-xs font-semibold text-text-primary">
-                      Post-Clip Viral Polish
+                      Hook & Viral Polish Studio
                     </h4>
                   </div>
                   <p className="text-[11px] text-text-secondary leading-relaxed">
-                    Fine-tune micro-edits on this generated clip to maximize audience completion rate and rewatch score.
+                    Merge auditory, visual, and verbal triggers to engineer the highest possible 3-second viewer retention.
                   </p>
                 </div>
 
-                {/* 1. Retention Progress Bar */}
+                {/* 1. Hook Headline Banner */}
+                <div className="bg-[#18181B] border border-border rounded-card p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-text-primary">
+                      Top Hook Headline Banner
+                    </span>
+                    <span className="text-[10px] text-text-muted">Hooks silent scrollers</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={hookHeadline}
+                    onChange={(e) => setHookHeadline(e.target.value)}
+                    placeholder="Enter viral headline banner..."
+                    className="w-full bg-[#111113] border border-border focus:border-accent text-xs rounded-control px-2.5 py-1.5 text-text-primary font-medium outline-none"
+                  />
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">
+                      One-Click Viral Presets:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        '🚨 WAIT TILL THE END',
+                        '⚠️ THE BIGGEST MISTAKE',
+                        '🤫 NOBODY TALKS ABOUT THIS',
+                        '💡 WATCH THIS FIRST',
+                        '🔥 99% FAIL AT THIS',
+                        '❌ STOP DOING THIS'
+                      ].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setHookHeadline(preset)}
+                          className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                            hookHeadline === preset
+                              ? 'bg-accent/20 text-accent border-accent/40 font-semibold'
+                              : 'bg-bg-surface text-text-secondary border-border hover:text-text-primary hover:border-[#3F3F46]'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. 3-Second Hook Optimizer Pack */}
+                <div className="bg-[#18181B] border border-border rounded-card p-3.5 space-y-3.5">
+                  <div className="border-b border-border/60 pb-2">
+                    <h5 className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
+                      <Flame className="w-3.5 h-3.5 text-accent" />
+                      3-Second Hook Optimizer
+                    </h5>
+                    <p className="text-[10px] text-text-muted mt-0.5">
+                      Stops scrollers within the first 200ms
+                    </p>
+                  </div>
+
+                  {/* Filler & Dead Air Stripper */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold text-text-primary block">
+                        Dead Air & Filler Stripper
+                      </span>
+                      <span className="text-[10px] text-text-muted">
+                        Cuts leading "Um / So / Yeah" and pauses
+                      </span>
+                    </div>
+                    <Toggle checked={stripFillers} onChange={setStripFillers} />
+                  </div>
+
+                  {/* 0.0s Acoustic Stinger */}
+                  <div className="space-y-2 border-t border-border/40 pt-2.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-semibold text-text-primary block">
+                          0.0s Acoustic Stinger
+                        </span>
+                        <span className="text-[10px] text-text-muted">
+                          Triggers involuntary orienting reflex
+                        </span>
+                      </div>
+                      <Toggle checked={hookStinger} onChange={setHookStinger} />
+                    </div>
+
+                    {hookStinger && (
+                      <div className="grid grid-cols-2 gap-1.5 pt-1">
+                        {[
+                          { id: 'whoosh', label: 'Airy Whoosh' },
+                          { id: 'sub_drop', label: '808 Sub Drop' },
+                          { id: 'vinyl', label: 'Vinyl Scratch' },
+                          { id: 'shutter', label: 'Camera Snap' }
+                        ].map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => setHookStingerType(s.id as any)}
+                            className={`text-[10px] py-1 px-2 rounded border text-center transition-all ${
+                              hookStingerType === s.id
+                                ? 'bg-accent/20 border-accent text-accent font-semibold'
+                                : 'bg-bg-surface border-border text-text-secondary hover:text-text-primary'
+                            }`}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 1.25x Eye Focus Snap-Zoom */}
+                  <div className="flex items-center justify-between border-t border-border/40 pt-2.5">
+                    <div>
+                      <span className="text-xs font-semibold text-text-primary block">
+                        1.25x Eye Focus Snap-Zoom
+                      </span>
+                      <span className="text-[10px] text-text-muted">
+                        Tight crop on 0.0s - 2.2s, snaps wide on setup
+                      </span>
+                    </div>
+                    <Toggle checked={hookSnapZoom} onChange={setHookSnapZoom} />
+                  </div>
+
+                  {/* Teaser Climax Cold Open */}
+                  <div className="flex items-center justify-between border-t border-border/40 pt-2.5">
+                    <div>
+                      <span className="text-xs font-semibold text-text-primary block">
+                        Teaser Climax Cold Open
+                      </span>
+                      <span className="text-[10px] text-text-muted">
+                        Prepend story revelation as a 2s teaser
+                      </span>
+                    </div>
+                    <Toggle checked={teaserStitch} onChange={setTeaserStitch} />
+                  </div>
+                </div>
+
+                {/* 3. Retention Progress Bar */}
                 <div className="bg-[#18181B] border border-border rounded-card p-3.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
@@ -787,7 +965,7 @@ export const ClipReviewStudio: React.FC = () => {
                     <Toggle checked={retentionBar} onChange={setRetentionBar} />
                   </div>
                   <p className="text-[11px] text-text-secondary">
-                    Burns a slim neon mint-green progress bar across the bottom. Viewers who see few seconds left finish the video.
+                    Burns a slim neon mint-green progress bar across the bottom.
                   </p>
                   {retentionBar && (
                     <div className="pt-1.5 flex items-center gap-2">
@@ -797,25 +975,22 @@ export const ClipReviewStudio: React.FC = () => {
                   )}
                 </div>
 
-                {/* 2. Pattern Interrupt Snap-Zooms */}
+                {/* 4. Pattern Interrupt Snap-Zooms */}
                 <div className="bg-[#18181B] border border-border rounded-card p-3.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-semibold text-text-primary block">
-                        Pattern Interrupt Snap-Zooms
+                        Pattern Interrupt Cuts (Every 4s)
                       </span>
                       <span className="text-[10px] text-text-muted">
-                        Cuts visual monotony every 3-5 seconds
+                        Cuts visual monotony on sentence shifts
                       </span>
                     </div>
                     <Toggle checked={patternZoom} onChange={setPatternZoom} />
                   </div>
-                  <p className="text-[11px] text-text-secondary">
-                    Applies sudden 1.18x punch-in cuts on key sentence transitions to reset the viewer's dopamine clock.
-                  </p>
                 </div>
 
-                {/* 3. Semantic Keyword Highlighting */}
+                {/* 5. Semantic Keyword Highlighting */}
                 <div className="bg-[#18181B] border border-border rounded-card p-3.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
@@ -823,14 +998,11 @@ export const ClipReviewStudio: React.FC = () => {
                         Semantic Keyword Highlighting
                       </span>
                       <span className="text-[10px] text-text-muted">
-                        Dynamic color pop on high-salience words
+                        Color pop on metrics & alert words
                       </span>
                     </div>
                     <Toggle checked={semanticHighlight} onChange={setSemanticHighlight} />
                   </div>
-                  <p className="text-[11px] text-text-secondary">
-                    Automatically colors currency & metrics in Mint Green, and alert words in Fire Red.
-                  </p>
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     <span className="text-[10px] px-2 py-0.5 rounded bg-[#00FF88]/15 text-[#00FF88] border border-[#00FF88]/30 font-mono font-semibold">
                       $100K / 99% (Mint)
@@ -838,13 +1010,10 @@ export const ClipReviewStudio: React.FC = () => {
                     <span className="text-[10px] px-2 py-0.5 rounded bg-[#FF3B30]/15 text-[#FF3B30] border border-[#FF3B30]/30 font-mono font-semibold">
                       Never / Mistake (Red)
                     </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-[#FFEA00]/15 text-[#FFEA00] border border-[#FFEA00]/30 font-mono font-semibold">
-                      Action (Style Pop)
-                    </span>
                   </div>
                 </div>
 
-                {/* 4. Kinetic Sound Effects */}
+                {/* 6. Kinetic Micro-SFX Drops */}
                 <div className="bg-[#18181B] border border-border rounded-card p-3.5 space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
@@ -857,9 +1026,6 @@ export const ClipReviewStudio: React.FC = () => {
                     </div>
                     <Toggle checked={kineticSfx} onChange={setKineticSfx} />
                   </div>
-                  <p className="text-[11px] text-text-secondary">
-                    Plays procedurally generated 48kHz audio pops on key highlights, dings on stats, and subtle whooshes.
-                  </p>
                 </div>
 
                 {/* Action Button: Apply Polish & Re-Render */}
@@ -867,11 +1033,11 @@ export const ClipReviewStudio: React.FC = () => {
                   variant="primary"
                   size="md"
                   className="w-full justify-center shadow-lg"
-                  icon={isPolishReRendering ? <RotateCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  icon={isPolishReRendering ? <RotateCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 text-black fill-current" />}
                   disabled={isPolishReRendering}
                   onClick={handleApplyPolish}
                 >
-                  {isPolishReRendering ? 'Burning Polish with VideoToolbox (~2s)...' : 'Apply Viral Polish & Re-Render'}
+                  {isPolishReRendering ? 'Burning Hook Polish with VideoToolbox (~2s)...' : 'Apply Hook & Viral Polish & Re-Render'}
                 </Button>
               </div>
             )}

@@ -58,7 +58,13 @@ def render_candidate_clip(
     watermark: Optional[str] = None,
     retention_bar: bool = False,
     semantic_highlighting: bool = True,
-    pattern_zoom: bool = True
+    pattern_zoom: bool = True,
+    strip_fillers: bool = True,
+    hook_stinger: bool = True,
+    hook_stinger_type: str = "whoosh",
+    hook_snap_zoom: bool = True,
+    teaser_stitch: bool = False,
+    hook_headline: Optional[str] = None
 ) -> Path:
     """
     Render a short clip with 9:16 framing, simulated multi-cam cuts, burned-in ASS captions,
@@ -68,6 +74,15 @@ def render_candidate_clip(
     vp = Path(video_path).resolve()
     base_out = Path(output_dir).resolve()
     base_out.mkdir(parents=True, exist_ok=True)
+
+    # 0. Hook Optimization: Strip leading dead air & filler words
+    from src.cliplocal.score.hooks import strip_leading_fillers, find_climax_teaser_sentence
+    if strip_fillers and candidate.words:
+        new_start, trimmed_words = strip_leading_fillers(candidate.words, candidate.start)
+        if new_start > candidate.start and (candidate.end - new_start) >= 12.0:
+            candidate.start = round(new_start, 3)
+            candidate.duration = round(candidate.end - candidate.start, 3)
+            candidate.words = trimmed_words
 
     slug = slugify(candidate.title or candidate.score.hook_type or "clip")
     clip_filename = f"clip_{candidate.index:02d}_{slug}.mp4"
@@ -81,16 +96,26 @@ def render_candidate_clip(
     if anti_copyright:
         background_music = True
 
+    # Context / Hook Headline
+    from src.cliplocal.context.extractor import extract_clip_context
+    if hook_headline and hook_headline.strip():
+        top_headline = hook_headline.strip()
+        candidate.title = top_headline
+        top_banner = True
+    elif teaser_stitch and candidate.sentences and len(candidate.sentences) >= 3:
+        climax = find_climax_teaser_sentence(candidate.sentences)
+        if climax:
+            top_headline = f"🚨 PREVIEW: {climax.text[:35]}..."
+            top_banner = True
+        else:
+            top_headline = candidate.title if top_banner else None
+    else:
+        if not candidate.title or candidate.title.strip().lower() in ("engaging moment", "untitled", "clip"):
+            candidate.title = extract_clip_context(candidate.text, candidate.sentences)
+        top_headline = candidate.title if top_banner else None
+
     # 1. Generate ASS subtitles for this clip in /tmp
     ass_path = Path("/tmp") / f"cliplocal_subs_{candidate.clip_id}_{candidate.index}.ass"
-    
-    # Extract dynamic, meaningful context headline from spoken words (never generic 'Engaging Moment')
-    from src.cliplocal.context.extractor import extract_clip_context
-    if not candidate.title or candidate.title.strip().lower() in ("engaging moment", "untitled", "clip"):
-        candidate.title = extract_clip_context(candidate.text, candidate.sentences)
-
-    top_headline = candidate.title if top_banner else None
-
     generate_ass_subtitles(
         words=candidate.words,
         output_ass_path=ass_path,
@@ -128,12 +153,16 @@ def render_candidate_clip(
 
     # Base Crop with Multi-Cam, Auto-Zoom or Pattern Interrupt Zooms
     if effective_mode in (ReframeMode.FACE_FOLLOW, ReframeMode.CENTER):
-        if (multicam or pattern_zoom or auto_zoom) and candidate.sentences:
+        if (multicam or pattern_zoom or auto_zoom or hook_snap_zoom) and candidate.sentences:
             intervals = compute_multicam_intervals(
                 candidate.duration,
                 candidate.sentences,
                 time_offset=candidate.start
             )
+            if hook_snap_zoom:
+                hook_span = (0.0, min(2.2, candidate.duration))
+                if not any(abs(start) < 0.1 for start, _ in intervals):
+                    intervals = [hook_span] + intervals
             base_crop = build_dynamic_zoom_filter(
                 in_w=in_w,
                 in_h=in_h,
@@ -141,10 +170,13 @@ def render_candidate_clip(
                 out_h=1920,
                 center_x_ratio=center_x,
                 intervals=intervals,
-                zoom_factor=1.22
+                zoom_factor=1.25 if hook_snap_zoom else 1.22
             )
-        elif auto_zoom:
+        elif auto_zoom or hook_snap_zoom:
             intervals = compute_punch_in_intervals(candidate.duration, candidate.sentences)
+            if hook_snap_zoom:
+                hook_span = (0.0, min(2.2, candidate.duration))
+                intervals = [hook_span] + [i for i in intervals if i[0] > 2.2]
             base_crop = build_dynamic_zoom_filter(
                 in_w=in_w,
                 in_h=in_h,
@@ -152,7 +184,7 @@ def render_candidate_clip(
                 out_h=1920,
                 center_x_ratio=center_x,
                 intervals=intervals,
-                zoom_factor=1.15
+                zoom_factor=1.25 if hook_snap_zoom else 1.15
             )
         else:
             base_crop = build_crop_filter(
@@ -229,30 +261,37 @@ def render_candidate_clip(
     audio_filter_parts: List[str] = []
     current_audio_label = "0:a"
 
-    # Optional Sound Effects on Keywords
-    if include_sfx and candidate.words:
+    # Optional Sound Effects & 0.0s Orienting Acoustic Stinger
+    if (include_sfx or hook_stinger) and candidate.words:
         sfx_assets = ensure_sfx_assets()
-        triggers = find_sfx_trigger_points(candidate.words, candidate.start)
+        triggers = find_sfx_trigger_points(candidate.words, candidate.start) if include_sfx else []
+
+        # Inject 0.0s Orienting Acoustic Stinger
+        if hook_stinger:
+            stinger_key = hook_stinger_type if hook_stinger_type in sfx_assets else "whoosh"
+            triggers = [(0.0, stinger_key)] + [t for t in triggers if t[0] > 0.6]
 
         if triggers:
             sfx_labels = []
-            for t_offset, sfx_type in triggers[:4]:
+            for t_offset, sfx_type in triggers[:5]:
                 sfx_file = sfx_assets.get(sfx_type, sfx_assets["pop"])
                 extra_inputs.append(str(sfx_file))
                 sfx_in_idx = next_input_idx
                 next_input_idx += 1
                 delay_ms = int(t_offset * 1000)
                 sfx_label = f"sfx{sfx_in_idx}"
+                vol = 0.45 if t_offset == 0.0 else 0.35
                 audio_filter_parts.append(
-                    f"[{sfx_in_idx}:a]adelay={delay_ms}|{delay_ms},volume=0.35[{sfx_label}]"
+                    f"[{sfx_in_idx}:a]adelay={delay_ms}|{delay_ms},volume={vol}[{sfx_label}]"
                 )
                 sfx_labels.append(f"[{sfx_label}]")
 
             all_sfx_inputs = f"[{current_audio_label}]" + "".join(sfx_labels)
             num_inputs = len(sfx_labels) + 1
             audio_filter_parts.append(
-                f"{all_sfx_inputs}amix=inputs={num_inputs}:dropout_transition=0:weights=1.0 " + " ".join(["0.4"] * len(sfx_labels)) + "[a_with_sfx]"
+                f"{all_sfx_inputs}amix=inputs={num_inputs}:dropout_transition=0:weights=1.0 " + " ".join(["0.45" if i == 0 and hook_stinger else "0.38" for i in range(len(sfx_labels))]) + "[a_with_sfx]"
             )
+            current_audio_label = "a_with_sfx"
             current_audio_label = "a_with_sfx"
 
     # Optional Anti-Copyright Transformative Audio Filter (Tempo & Vocal EQ)

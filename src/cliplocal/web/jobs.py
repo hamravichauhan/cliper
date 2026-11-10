@@ -257,7 +257,16 @@ class JobManager:
                 anti_copyright=bool(options.get("anti_copyright", False)),
                 broll=bool(options.get("broll", False)),
                 extract_thumbnails=True,
-                watermark=options.get("watermark")
+                watermark=options.get("watermark"),
+                retention_bar=bool(options.get("retention_bar", False)),
+                semantic_highlighting=bool(options.get("semantic_highlighting", True)),
+                pattern_zoom=bool(options.get("pattern_zoom", True)),
+                strip_fillers=bool(options.get("strip_fillers", True)),
+                hook_stinger=bool(options.get("hook_stinger", True)),
+                hook_stinger_type=str(options.get("hook_stinger_type", "whoosh")),
+                hook_snap_zoom=bool(options.get("hook_snap_zoom", True)),
+                teaser_stitch=bool(options.get("teaser_stitch", False)),
+                hook_headline=options.get("hook_headline")
             )
             return cand
 
