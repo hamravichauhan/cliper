@@ -54,6 +54,14 @@ class VideoMetadata(BaseModel):
     audio_sample_rate: int = 44100
     audio_channels: int = 2
     file_size_bytes: int = 0
+    title: Optional[str] = None
+    channel: Optional[str] = None
+    source_url: Optional[str] = None
+    video_id: Optional[str] = None
+    detected_license: Optional[str] = None
+    is_creative_commons: bool = False
+    downloaded_at_utc: Optional[str] = None
+    source_sha256_audio: Optional[str] = None
 
 class ScoreBreakdown(BaseModel):
     total_score: float = Field(0.0, ge=0.0, le=100.0)
@@ -102,6 +110,7 @@ class JobStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    INTERRUPTED = "interrupted"
 
 class JobState(BaseModel):
     job_id: str

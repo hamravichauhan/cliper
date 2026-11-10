@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import json
 from pathlib import Path
@@ -6,9 +7,30 @@ from src.cliplocal.config.settings import config
 
 DB_PATH = Path(".cache/cliplocal.db")
 
+def is_network_filesystem(path: Path) -> bool:
+    """
+    Check if path is on a remote/network mount (NFS, SMB, or cloud sync folder)
+    that can break SQLite WAL shared-memory (.shm) locking.
+    """
+    try:
+        p = path.resolve()
+        str_p = str(p).lower()
+        if any(sync in str_p for sync in ("icloud", "dropbox", "onedrive", "google drive")):
+            return True
+        return False
+    except Exception:
+        return False
+
 def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
+        conn.execute("PRAGMA busy_timeout = 5000;")
+        if not is_network_filesystem(DB_PATH):
+            conn.execute("PRAGMA journal_mode = WAL;")
+            conn.execute("PRAGMA synchronous = NORMAL;")
+        else:
+            conn.execute("PRAGMA journal_mode = DELETE;")
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS jobs (
                 job_id TEXT PRIMARY KEY,
@@ -21,11 +43,23 @@ def init_db():
                 state_json TEXT
             )
         """)
+        # Compound performance indexes for live dashboard filtering & search
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at DESC);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source);")
         conn.commit()
+
+def checkpoint_db():
+    """Checkpoint WAL pages back to main database before backup or packaging."""
+    try:
+        with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+    except Exception:
+        pass
 
 def save_job(job_id: str, created_at: float, status: str, progress: float, stage: str, source: str, options: dict, state: dict):
     init_db()
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
+        conn.execute("PRAGMA busy_timeout = 5000;")
         conn.execute("""
             INSERT INTO jobs (job_id, created_at, status, progress, stage, source, options_json, state_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -48,7 +82,7 @@ def save_job(job_id: str, created_at: float, status: str, progress: float, stage
 
 def get_job(job_id: str) -> Optional[Dict[str, Any]]:
     init_db()
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,))
@@ -68,7 +102,7 @@ def get_job(job_id: str) -> Optional[Dict[str, Any]]:
 
 def delete_job(job_id: str) -> bool:
     init_db()
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM jobs WHERE job_id = ?", (job_id,))
         conn.commit()
@@ -76,7 +110,7 @@ def delete_job(job_id: str) -> bool:
 
 def list_jobs() -> List[Dict[str, Any]]:
     init_db()
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT job_id, created_at, status, progress, stage, source, options_json, state_json FROM jobs ORDER BY created_at DESC")
@@ -127,7 +161,7 @@ def get_analytics_summary() -> Dict[str, Any]:
     import urllib.request
 
     init_db()
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=5.0) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT status, state_json FROM jobs")

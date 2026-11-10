@@ -66,8 +66,10 @@ def render_candidate_clip(
     slug = slugify(candidate.title or candidate.score.hook_type or "clip")
     clip_filename = f"clip_{candidate.index:02d}_{slug}.mp4"
     sidecar_filename = f"clip_{candidate.index:02d}_{slug}.json"
+    transform_log_filename = f"clip_{candidate.index:02d}_{slug}_transformation_log.json"
     mp4_out = base_out / clip_filename
     json_out = base_out / sidecar_filename
+    transform_log_out = base_out / transform_log_filename
 
     # If anti-copyright is enabled, automatically layer background music for audio masking
     if anti_copyright:
@@ -297,7 +299,36 @@ def render_candidate_clip(
     candidate.output_path = str(mp4_out)
 
     # 7. Write JSON sidecar
+    import datetime
+
+    # Full source provenance block
+    source_info = {
+        "url": getattr(metadata, "source_url", None) or str(vp),
+        "video_id": getattr(metadata, "video_id", None) or vp.stem,
+        "channel": getattr(metadata, "channel", None) or "Local Video",
+        "duration_sec": getattr(metadata, "duration", candidate.duration),
+        "downloaded_at_utc": getattr(metadata, "downloaded_at_utc", None) or datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "source_sha256_audio": getattr(metadata, "source_sha256_audio", None) or getattr(metadata, "file_hash", "unknown"),
+        "detected_license": getattr(metadata, "detected_license", "Standard License"),
+        "is_creative_commons": getattr(metadata, "is_creative_commons", False)
+    }
+
+    transformation_factors = {
+        "audio_tempo_multiplier": 1.025 if anti_copyright else 1.0,
+        "vocal_presence_eq": anti_copyright,
+        "ambient_music_layering": background_music or anti_copyright,
+        "vertical_reframing_mode": reframe_mode.value,
+        "simulated_multicam": multicam,
+        "top_banner_hook": top_banner,
+        "contextual_emojis": include_emojis,
+        "sound_effects": include_sfx,
+        "burned_captions_style": candidate.caption_style.value
+    }
+
     sidecar_data = {
+        "legal_notice": "This document logs automated creative transformations. It constitutes technical metadata, not legal fair-use determination. Users bear sole responsibility for copyright compliance.",
+        "source": source_info,
+        "transformation_factors": transformation_factors,
         "clip_id": candidate.clip_id,
         "index": candidate.index,
         "output_mp4": str(mp4_out),
@@ -327,6 +358,9 @@ def render_candidate_clip(
         sidecar_data["transformative_meta"] = get_transformative_meta()
 
     with open(json_out, "w", encoding="utf-8") as f:
+        json.dump(sidecar_data, f, indent=2)
+
+    with open(transform_log_out, "w", encoding="utf-8") as f:
         json.dump(sidecar_data, f, indent=2)
 
     return mp4_out

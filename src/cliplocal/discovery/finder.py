@@ -2,6 +2,7 @@ import re
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import yt_dlp
+from src.cliplocal.ingest.license import analyze_video_license
 
 class DiscoveredVideo(BaseModel):
     id: str
@@ -13,6 +14,10 @@ class DiscoveredVideo(BaseModel):
     duration_sec: float
     duration_formatted: str
     thumbnail_url: str
+    is_creative_commons: bool = False
+    license_name: str = "Standard YouTube License"
+    risk_level: str = "standard"
+    badge_label: str = "Standard License"
 
 CURATED_PRESETS: Dict[str, List[Dict[str, str]]] = {
     "Business & Wealth": [
@@ -100,6 +105,13 @@ def search_viral_long_videos(
                 v_url = e.get("url") or f"https://www.youtube.com/watch?v={v_id}"
                 thumb = e.get("thumbnail") or f"https://i.ytimg.com/vi/{v_id}/hqdefault.jpg"
 
+                lic = analyze_video_license(
+                    info_dict=e,
+                    channel=channel,
+                    description=e.get("description") or "",
+                    url=v_url
+                )
+
                 results.append(DiscoveredVideo(
                     id=v_id,
                     title=title,
@@ -109,7 +121,11 @@ def search_viral_long_videos(
                     view_count_formatted=format_view_count(views),
                     duration_sec=dur,
                     duration_formatted=format_duration(dur),
-                    thumbnail_url=thumb
+                    thumbnail_url=thumb,
+                    is_creative_commons=lic["is_creative_commons"],
+                    license_name=lic["license_name"],
+                    risk_level=lic["risk_level"],
+                    badge_label=lic["badge_label"]
                 ))
         except Exception:
             pass

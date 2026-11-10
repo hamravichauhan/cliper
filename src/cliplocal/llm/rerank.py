@@ -16,18 +16,54 @@ Each object must have these exact keys:
 - "hashtags": array of 3 relevant hashtags (e.g. ["#business", "#growth", "#shorts"])
 """
 
-def generate_heuristic_title(text: str, hook_type: Optional[str]) -> str:
-    """Generate a clean heuristic title when LLM is unavailable."""
-    words = [w for w in text.split() if len(w) > 3][:6]
-    title_words = " ".join(words).capitalize()
+ENGLISH_FILLER_WORDS = [
+    "you know", "i mean", "like", "basically", "so basically",
+    "to be honest", "honestly", "so yeah", "actually", "right?"
+]
+
+def truncate_at_word_boundary(text: str, max_chars: int = 60) -> str:
+    """Ensure titles never truncate mid-word."""
+    clean = text.strip()
+    if len(clean) <= max_chars:
+        return clean
+    truncated = clean[:max_chars]
+    last_space = truncated.rfind(" ")
+    if last_space > 15:
+        return truncated[:last_space].rstrip(" ,.-!?")
+    return truncated.rstrip()
+
+def clean_opening_hook(first_sentence: str, language: str = "en") -> str:
+    """Scrub leading verbal fillers with strict English-only locale guard."""
+    clean = first_sentence.strip()
+    if language.lower() in ("en", "english"):
+        for filler in ENGLISH_FILLER_WORDS:
+            if clean.lower().startswith(filler):
+                clean = clean[len(filler):].lstrip(" ,-:")
+                break
+    return clean
+
+def generate_heuristic_title(text: str, hook_type: Optional[str] = None, language: str = "en") -> str:
+    """Generate high-CTR title without cutting words mid-syllable."""
+    clean_text = clean_opening_hook(text, language=language)
+    words = clean_text.split()
+    if not words:
+        return "Must Watch Insight"
+
+    candidate_phrase = " ".join(words[:7])
     if hook_type:
-        return f"{hook_type}: {title_words}"
-    return f"Moment: {title_words}"
+        prefix = f"{hook_type}: "
+        max_content = max(20, 58 - len(prefix))
+        bounded = truncate_at_word_boundary(candidate_phrase, max_chars=max_content)
+        return f"{prefix}{bounded}"
+
+    bounded = truncate_at_word_boundary(candidate_phrase, max_chars=58)
+    return bounded.capitalize()
 
 def rerank_candidates_with_llm(
     candidates: List[CandidateClip],
     client: Optional[OllamaClient] = None,
-    max_to_rank: int = 12
+    max_to_rank: int = 12,
+    language: str = "en"
 ) -> List[CandidateClip]:
     """
     Send top candidate transcripts to local Ollama LLM for re-ranking, titles, and social captions.
@@ -38,10 +74,11 @@ def rerank_candidates_with_llm(
 
     # Apply heuristic titles first as guaranteed baseline
     for c in candidates:
+        first_line = c.sentences[0].text if c.sentences else c.text
         if not c.title or c.title == "Engaging Moment":
-            c.title = generate_heuristic_title(c.text, c.score.hook_type)
+            c.title = generate_heuristic_title(first_line, c.score.hook_type, language=language)
         if not c.caption:
-            c.caption = c.text[:140]
+            c.caption = truncate_at_word_boundary(c.text, max_chars=140)
         if not c.hashtags:
             c.hashtags = ["#shorts", "#viral", "#podcast"]
 

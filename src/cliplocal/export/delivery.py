@@ -136,6 +136,13 @@ def create_client_delivery_bundle(
             if thumb_path.exists():
                 shutil.copyfile(thumb_path, clip_dir / f"cover_{t_idx+1}.jpg")
 
+        # 2.5 Copy Creative Transformation Log
+        if cand.output_path:
+            mp4_p = Path(cand.output_path)
+            cand_logs = list(mp4_p.parent.glob(f"clip_{cand.index:02d}_*_transformation_log.json"))
+            if cand_logs and cand_logs[0].exists():
+                shutil.copyfile(cand_logs[0], clip_dir / "transformation_log.json")
+
         # 3. Generate Social Copy
         copy_bundle = generate_social_copy(cand, brand_handle=brand_handle)
         (clip_dir / "post_copy_instagram.txt").write_text(copy_bundle.instagram.formatted_post, encoding="utf-8")
