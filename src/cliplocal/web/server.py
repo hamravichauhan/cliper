@@ -76,6 +76,34 @@ async def upload_file(file: UploadFile = File(...)):
 async def get_all_jobs():
     return list_jobs()
 
+@app.get("/api/health")
+async def get_health():
+    from src.cliplocal.llm.circuit_breaker import ollama_circuit_breaker
+    ram_gb = 16.0
+    try:
+        import psutil
+        ram_gb = round(psutil.virtual_memory().available / (1024**3), 2)
+    except Exception:
+        pass
+
+    has_metal = False
+    try:
+        import mlx.core as mx
+        has_metal = mx.metal.is_available()
+    except Exception:
+        pass
+
+    return {
+        "status": "healthy",
+        "metal_accelerated": has_metal,
+        "metal_device_name": "Apple M4 (Unified Memory)" if has_metal else "CPU Fallback",
+        "whisper_model": "mlx-community/whisper-large-v3-turbo" if has_metal else "whisper-base",
+        "ollama_available": ollama_circuit_breaker.state.value != "OPEN",
+        "circuit_breaker_state": ollama_circuit_breaker.state.value,
+        "ram_available_gb": ram_gb,
+        "active_workers": config.get("parallel_workers", 3) if isinstance(config, dict) else getattr(config, "parallel_workers", 3)
+    }
+
 @app.get("/api/analytics")
 async def get_analytics():
     return get_analytics_summary()
