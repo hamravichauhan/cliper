@@ -22913,5 +22913,6 @@ export const mockEngineHealth: EngineHealth = {
   ollamaModel: 'llama3.2:latest',
   circuitBreakerState: 'CLOSED',
   activeWorkers: 3,
+  maxWorkers: 3,
   ramAvailableGb: 6.5
 };

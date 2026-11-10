@@ -38,7 +38,8 @@ import {
   Maximize2,
   Zap,
   Flame,
-  Activity
+  Activity,
+  Video
 } from 'lucide-react'
 
 export const ClipReviewStudio: React.FC = () => {

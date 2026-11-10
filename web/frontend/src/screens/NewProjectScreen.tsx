@@ -550,7 +550,7 @@ export const NewProjectScreen: React.FC = () => {
                   </p>
                 </div>
 
-                <Badge variant={muteOriginal ? 'accent' : 'primary'} size="sm">
+                <Badge variant={muteOriginal ? 'accent' : 'muted'} size="sm">
                   {muteOriginal ? 'Primary Soundtrack' : 'Auto-Ducked Background'}
                 </Badge>
               </div>

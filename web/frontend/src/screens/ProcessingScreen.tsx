@@ -372,7 +372,7 @@ export const ProcessingScreen: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className="font-semibold text-text-primary">Overall Pipeline Progress</span>
             <Badge
-              variant={isFinished ? 'accent' : isFailed ? 'danger' : isCancelled ? 'muted' : 'primary'}
+              variant={isFinished ? 'accent' : isFailed ? 'danger' : isCancelled ? 'muted' : 'outline'}
               size="sm"
             >
               {jobData.stage || jobData.status}
