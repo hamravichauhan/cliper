@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
@@ -15,7 +15,8 @@ import {
   ExternalLink,
   PlusCircle,
   FileSpreadsheet,
-  FileArchive
+  FileArchive,
+  RefreshCw
 } from 'lucide-react'
 
 export const ProjectsScreen: React.FC = () => {
@@ -25,11 +26,17 @@ export const ProjectsScreen: React.FC = () => {
     setScreen,
     addToast,
     downloadDeliveryBundle,
-    downloadScheduleCSV
+    downloadScheduleCSV,
+    fetchProjects,
+    deleteProject
   } = useStore()
   const [filter, setFilter] = useState<'all' | 'processing' | 'completed' | 'failed'>('all')
   const [search, setSearch] = useState('')
   const [deleteModalProject, setDeleteModalProject] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetchProjects()
+  }, [fetchProjects])
 
   const filtered = projects.filter((p) => {
     const matchesFilter = filter === 'all' ? true : p.status === filter
@@ -186,9 +193,11 @@ export const ProjectsScreen: React.FC = () => {
           <Button
             variant="danger"
             size="sm"
-            onClick={() => {
-              addToast({ title: 'Project Deleted', type: 'info' })
-              setDeleteModalProject(null)
+            onClick={async () => {
+              if (deleteModalProject) {
+                await deleteProject(deleteModalProject)
+                setDeleteModalProject(null)
+              }
             }}
           >
             Confirm Delete

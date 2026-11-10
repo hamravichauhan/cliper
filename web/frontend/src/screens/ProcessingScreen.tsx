@@ -15,7 +15,8 @@ import {
   Sparkles,
   AlertCircle,
   Copy,
-  Check
+  Check,
+  LayoutDashboard
 } from 'lucide-react'
 
 interface JobData {
@@ -38,7 +39,9 @@ export const ProcessingScreen: React.FC = () => {
     setActiveJobId,
     setScreen,
     addToast,
-    loadJobIntoStudio
+    loadJobIntoStudio,
+    fetchProjects,
+    fetchAnalytics
   } = useStore()
 
   const [jobData, setJobData] = useState<JobData | null>(null)
@@ -66,6 +69,13 @@ export const ProcessingScreen: React.FC = () => {
           if (isMounted) {
             setJobData(data)
             setIsLoading(false)
+
+            if (data.status === 'completed') {
+              // Preload clips into studio and sync dashboard
+              loadJobIntoStudio(data.job_id, false)
+              fetchProjects()
+              fetchAnalytics()
+            }
           }
         }
       } catch (err) {
@@ -199,19 +209,43 @@ export const ProcessingScreen: React.FC = () => {
   const isCancelled = jobData.status === 'cancelled'
   const isRunning = !isFinished && !isFailed && !isCancelled
 
-  // Dynamic ETA Calculation
+  // Intelligent Stage-Aware ETA Calculation (Calibrated for Apple Silicon M4)
   const elapsedSec = Math.max(1, Math.round(Date.now() / 1000 - jobData.created_at))
+  const videoDurationSec = jobData.metadata?.duration || 3600
   let etaText = 'Calculating...'
+
   if (isFinished) {
-    etaText = `Completed in ${elapsedSec}s`
+    etaText = `Completed in ${Math.round(elapsedSec)}s`
   } else if (isFailed) {
     etaText = 'Failed'
   } else if (isCancelled) {
     etaText = 'Cancelled'
-  } else if (progress > 5) {
-    const remainingSec = Math.max(2, Math.round((elapsedSec / (progress / 100)) - elapsedSec))
-    if (remainingSec > 60) {
-      etaText = `~${Math.floor(remainingSec / 60)}m ${remainingSec % 60}s remaining`
+  } else {
+    let remainingSec = 60
+    if (jobData.status === 'ingesting' || progress < 20) {
+      remainingSec = 90
+    } else if (
+      jobData.status === 'transcribing' ||
+      jobData.status === 'segmenting' ||
+      (progress >= 20 && progress < 50)
+    ) {
+      // Whisper MLX Turbo runs at ~10x real-time speed on Apple M4 GPU
+      const whisperTotalSec = Math.round(videoDurationSec / 10.0)
+      const ingestTime = jobData.timing_report?.['Ingest & Probe'] || 120
+      const transcribeElapsed = Math.max(0, elapsedSec - ingestTime)
+      const whisperRemaining = Math.max(30, whisperTotalSec - transcribeElapsed)
+      remainingSec = whisperRemaining + 25 + 60
+    } else if (jobData.status === 'scoring' || (progress >= 50 && progress < 70)) {
+      remainingSec = 75
+    } else if (jobData.status === 'rendering' || progress >= 70) {
+      const remainingProgressRatio = Math.max(0.1, (100 - progress) / 30.0)
+      remainingSec = Math.max(5, Math.round(60 * remainingProgressRatio))
+    }
+
+    if (remainingSec >= 60) {
+      const mins = Math.floor(remainingSec / 60)
+      const secs = remainingSec % 60
+      etaText = `~${mins}m ${secs > 0 ? `${secs}s` : ''} remaining`
     } else {
       etaText = `~${remainingSec}s remaining`
     }
@@ -417,19 +451,33 @@ export const ProcessingScreen: React.FC = () => {
         </div>
 
         {isFinished && (
-          <div className="pt-4 border-t border-border flex items-center justify-between">
+          <div className="pt-4 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <span className="text-xs text-status-success font-medium flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4" />
               All short-form clips rendered and ready for review.
             </span>
-            <Button
-              variant="primary"
-              size="md"
-              icon={<Sparkles className="w-4 h-4" />}
-              onClick={handleOpenStudio}
-            >
-              Open in Clip Review Studio
-            </Button>
+            <div className="flex items-center gap-2.5">
+              <Button
+                variant="secondary"
+                size="md"
+                icon={<LayoutDashboard className="w-4 h-4" />}
+                onClick={() => {
+                  fetchProjects()
+                  fetchAnalytics()
+                  setScreen('home')
+                }}
+              >
+                Go to Dashboard
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                icon={<Sparkles className="w-4 h-4" />}
+                onClick={handleOpenStudio}
+              >
+                Open in Clip Review Studio
+              </Button>
+            </div>
           </div>
         )}
       </div>

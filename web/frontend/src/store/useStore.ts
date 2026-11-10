@@ -40,6 +40,23 @@ interface AppState {
   activeJobId: string | null
   setActiveJobId: (jobId: string | null) => void
 
+  // Analytics & Jobs
+  analytics: {
+    total_jobs: number
+    completed_jobs: number
+    running_jobs: number
+    failed_jobs: number
+    total_clips: number
+    total_minutes_processed: number
+    estimated_hours_saved: number
+    average_virality_score: number
+    storage_used_mb: number
+    system?: any
+  } | null
+  fetchAnalytics: () => Promise<void>
+  fetchProjects: () => Promise<void>
+  deleteProject: (projectId: string) => Promise<boolean>
+
   // Brand Kits
   brandKits: BrandKit[]
   activeBrandKitId: string
@@ -80,7 +97,7 @@ interface AppState {
   downloadScheduleCSV: (jobId?: string) => void
   reRenderCurrentClip: (clipId: string, options: any) => Promise<boolean>
   submitNewJob: (payload: any) => Promise<string | null>
-  loadJobIntoStudio: (jobId: string) => Promise<boolean>
+  loadJobIntoStudio: (jobId: string, switchScreen?: boolean) => Promise<boolean>
   fetchHealth: () => Promise<void>
 
   // Toasts
@@ -106,6 +123,83 @@ export const useStore = create<AppState>((set, get) => ({
   selectedClipId: mockClips[0]?.id || null,
   activeJobId: null,
   setActiveJobId: (jobId) => set({ activeJobId: jobId }),
+
+  analytics: null,
+
+  fetchAnalytics: async () => {
+    try {
+      const res = await fetch('/api/analytics')
+      if (res.ok) {
+        const data = await res.json()
+        set({ analytics: data })
+      }
+    } catch {
+      // offline fallback
+    }
+  },
+
+  fetchProjects: async () => {
+    try {
+      const res = await fetch('/api/jobs')
+      if (res.ok) {
+        const jobs = await res.json()
+        if (Array.isArray(jobs) && jobs.length > 0) {
+          const mappedProjects: Project[] = jobs.map((j: any) => {
+            let cleanTitle = j.title || j.source || 'Untitled Harvest'
+            if (cleanTitle.startsWith('watch?v=') && j.source) {
+              const videoId = j.source.split('v=')[1]?.substring(0, 11)
+              cleanTitle = videoId ? `Video (${videoId})` : cleanTitle
+            }
+            return {
+              id: j.job_id,
+              title: cleanTitle,
+              source: j.source || j.source_url_or_path || '',
+              sourceType: ((j.source || '').startsWith('http') ? 'youtube' : 'upload') as any,
+              rightsConfirmed: true,
+              status: (j.status === 'completed' ? 'completed' : j.status === 'failed' ? 'failed' : 'processing') as any,
+              createdAt: new Date((j.created_at || Date.now() / 1000) * 1000).toISOString().split('T')[0],
+              durationSec: Math.round(j.duration || 600),
+              clipsCount: j.clip_count || (j.candidates ? j.candidates.length : 0),
+              avgScore: Math.round(j.avg_virality_score || 80),
+              thumbnailUrl: '',
+              clips: []
+            }
+          })
+
+          set((state) => {
+            // Keep any active project details or fallback
+            return {
+              projects: mappedProjects
+            }
+          })
+        }
+      }
+    } catch {
+      // offline fallback
+    }
+  },
+
+  deleteProject: async (projectId: string) => {
+    try {
+      const res = await fetch(`/api/jobs/${projectId}`, { method: 'DELETE' })
+      if (res.ok) {
+        set((state) => ({
+          projects: state.projects.filter((p) => p.id !== projectId)
+        }))
+        get().addToast({
+          title: 'Project Deleted',
+          description: `Job ${projectId} removed from database.`,
+          type: 'info'
+        })
+        get().fetchAnalytics()
+        get().fetchProjects()
+        return true
+      }
+    } catch {
+      // fallback
+    }
+    return false
+  },
 
   brandKits: mockBrandKits,
   activeBrandKitId: mockBrandKits[0].id,
@@ -230,17 +324,21 @@ export const useStore = create<AppState>((set, get) => ({
     set({ selectedClipId: clipId, isPlaying: false, currentTime: 0.0 })
   },
 
-  selectProject: (projectId) => {
-    const proj = get().projects.find((p) => p.id === projectId)
-    if (proj) {
-      set({
-        activeProject: proj,
-        clips: proj.clips.length > 0 ? proj.clips : mockClips,
-        selectedClipId: proj.clips[0]?.id || mockClips[0]?.id || null,
-        currentScreen: 'studio',
-        currentTime: 0.0,
-        isPlaying: false
-      })
+  selectProject: async (projectId: string) => {
+    // Attempt to load full candidate clips directly from backend
+    const success = await get().loadJobIntoStudio(projectId, true)
+    if (!success) {
+      const proj = get().projects.find((p) => p.id === projectId)
+      if (proj) {
+        set({
+          activeProject: proj,
+          clips: proj.clips.length > 0 ? proj.clips : mockClips,
+          selectedClipId: proj.clips[0]?.id || mockClips[0]?.id || null,
+          currentScreen: 'studio',
+          currentTime: 0.0,
+          isPlaying: false
+        })
+      }
     }
   },
 
@@ -454,23 +552,26 @@ export const useStore = create<AppState>((set, get) => ({
     return null
   },
 
-  loadJobIntoStudio: async (jobId: string) => {
+  loadJobIntoStudio: async (jobId: string, switchScreen: boolean = true) => {
     try {
       const res = await fetch(`/api/jobs/${jobId}`)
       if (res.ok) {
         const job = await res.json()
         if (job.candidates && job.candidates.length > 0) {
           const transformedClips: Clip[] = job.candidates.map((c: any, idx: number) => {
-            const streamUrl = c.video_path ? `/api/media/stream?path=${encodeURIComponent(c.video_path)}` : ''
-            const thumbUrl = c.thumbnail_path ? `/api/media/stream?path=${encodeURIComponent(c.thumbnail_path)}` : ''
+            const videoPath = c.output_path || c.video_path || ''
+            const streamUrl = videoPath ? `/api/media/stream?path=${encodeURIComponent(videoPath)}` : ''
+            const thumbPath = (c.thumbnails && c.thumbnails.length > 0 ? c.thumbnails[0] : null) || c.thumbnail_path || ''
+            const thumbUrl = thumbPath ? `/api/media/stream?path=${encodeURIComponent(thumbPath)}` : ''
+
             return {
-              id: `job-${job.job_id}-clip-${c.index || idx + 1}`,
+              id: c.clip_id || `job-${job.job_id}-clip-${c.index || idx + 1}`,
               index: c.index || idx + 1,
               title: c.title || c.spoken_context || `Viral Hook Clip #${c.index || idx + 1}`,
               startTime: c.start,
               endTime: c.end,
               duration: c.duration,
-              viralityScore: Math.round(c.score?.total_score || 85),
+              viralityScore: Math.round(c.score?.total_score || c.score?.virality_score || 85),
               factors: {
                 hook: Math.round(c.score?.hook_score || 88),
                 acoustics: Math.round(c.score?.acoustics_score || 85),
@@ -489,13 +590,13 @@ export const useStore = create<AppState>((set, get) => ({
                 end: w.end
               })),
               fullText: c.text || '',
-              captionStyle: c.caption_style || 'hormozi',
+              captionStyle: c.caption_style || 'emerald',
               copy: {
                 youtubeTitle: `${c.title || 'Must Watch'} #shorts`,
                 youtubeDescription: `${c.text}\n\nProcessed 100% offline with ClipLocal.`,
-                youtubeTags: ['#shorts', '#viral', '#podcast'],
-                instagramCaption: `${c.title || 'Mind blowing moment'} 🔥\n\nDrop your thoughts below!`,
-                hashtags: ['#shorts', '#viral', '#reels']
+                youtubeTags: c.hashtags || ['#shorts', '#viral', '#podcast'],
+                instagramCaption: `${c.caption || c.title || 'Mind blowing moment'} 🔥\n\nDrop your thoughts below!`,
+                hashtags: c.hashtags || ['#shorts', '#viral', '#reels']
               },
               narrativeFlags: {
                 sponsorshipRisk: 0,
@@ -505,9 +606,16 @@ export const useStore = create<AppState>((set, get) => ({
             }
           })
 
+          let displayTitle = job.metadata?.title || job.title
+          if (!displayTitle || displayTitle.startsWith('watch?v=')) {
+            const rawFile = job.metadata?.file_path || job.source_url_or_path || ''
+            const name = rawFile.split('/').pop()?.replace('.mp4', '') || ''
+            displayTitle = name.includes('_') ? name.split('_').slice(1).join('_') : name || 'Viral Video Harvest'
+          }
+
           const newProject: Project = {
             id: job.job_id,
-            title: job.metadata?.title || job.source_url_or_path.split('/').pop() || 'Untitled Project',
+            title: displayTitle,
             source: job.source_url_or_path,
             sourceType: job.source_url_or_path.startsWith('http') ? 'youtube' : 'upload',
             rightsConfirmed: true,
@@ -527,14 +635,16 @@ export const useStore = create<AppState>((set, get) => ({
             activeProject: newProject,
             clips: transformedClips,
             selectedClipId: transformedClips[0]?.id || null,
-            currentScreen: 'studio'
+            ...(switchScreen ? { currentScreen: 'studio' } : {})
           }))
 
-          get().addToast({
-            title: 'Project Loaded in Studio',
-            description: `${transformedClips.length} rendered clips loaded into Clip Review Studio.`,
-            type: 'success'
-          })
+          if (switchScreen) {
+            get().addToast({
+              title: 'Project Loaded in Studio',
+              description: `${transformedClips.length} rendered clips loaded into Clip Review Studio.`,
+              type: 'success'
+            })
+          }
           return true
         }
       }

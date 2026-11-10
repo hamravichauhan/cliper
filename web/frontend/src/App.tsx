@@ -19,13 +19,19 @@ import { ScheduleScreen } from './screens/ScheduleScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 
 export const App: React.FC = () => {
-  const { currentScreen, fetchHealth } = useStore()
+  const { currentScreen, fetchHealth, fetchProjects, fetchAnalytics } = useStore()
 
   useEffect(() => {
     fetchHealth()
-    const interval = setInterval(fetchHealth, 5000)
+    fetchProjects()
+    fetchAnalytics()
+    const interval = setInterval(() => {
+      fetchHealth()
+      fetchProjects()
+      fetchAnalytics()
+    }, 4000)
     return () => clearInterval(interval)
-  }, [fetchHealth])
+  }, [fetchHealth, fetchProjects, fetchAnalytics])
 
   const renderScreen = () => {
     switch (currentScreen) {
