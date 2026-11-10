@@ -55,7 +55,10 @@ def render_candidate_clip(
     anti_copyright: bool = False,
     broll: bool = False,
     extract_thumbnails: bool = True,
-    watermark: Optional[str] = None
+    watermark: Optional[str] = None,
+    retention_bar: bool = False,
+    semantic_highlighting: bool = True,
+    pattern_zoom: bool = True
 ) -> Path:
     """
     Render a short clip with 9:16 framing, simulated multi-cam cuts, burned-in ASS captions,
@@ -96,7 +99,8 @@ def render_candidate_clip(
         include_emojis=include_emojis,
         top_hook_headline=top_headline,
         top_hook_persistent=False,
-        clip_duration=candidate.duration
+        clip_duration=candidate.duration,
+        semantic_highlighting=semantic_highlighting
     )
 
     # 2. Reframe Analysis & Filter Construction
@@ -122,9 +126,9 @@ def render_candidate_clip(
     video_filter_parts: List[str] = []
     next_input_idx = 1
 
-    # Base Crop with Multi-Cam or Auto-Zoom
+    # Base Crop with Multi-Cam, Auto-Zoom or Pattern Interrupt Zooms
     if effective_mode in (ReframeMode.FACE_FOLLOW, ReframeMode.CENTER):
-        if multicam and candidate.sentences:
+        if (multicam or pattern_zoom or auto_zoom) and candidate.sentences:
             intervals = compute_multicam_intervals(
                 candidate.duration,
                 candidate.sentences,
@@ -137,7 +141,7 @@ def render_candidate_clip(
                 out_h=1920,
                 center_x_ratio=center_x,
                 intervals=intervals,
-                zoom_factor=1.24
+                zoom_factor=1.22
             )
         elif auto_zoom:
             intervals = compute_punch_in_intervals(candidate.duration, candidate.sentences)
@@ -209,7 +213,16 @@ def render_candidate_clip(
 
     # Subtitles burn-in
     escaped_ass = str(ass_path).replace("\\", "/").replace(":", "\\:")
-    video_filter_parts.append(f"[{curr_v_label}]ass={escaped_ass}[v_out]")
+    video_filter_parts.append(f"[{curr_v_label}]ass={escaped_ass}[v_subbed]")
+    curr_v_label = "v_subbed"
+
+    # Optional 3px Slim Retention Progress Bar across the bottom (prevents mobile drop-off)
+    if retention_bar:
+        dur = max(1.0, candidate.duration)
+        video_filter_parts.append(f"[{curr_v_label}]drawbox=x=0:y=ih-10:w='min(iw, iw*(t/{dur}))':h=6:color=#00FF88@0.95:t=fill[v_bar]")
+        curr_v_label = "v_bar"
+
+    video_filter_parts.append(f"[{curr_v_label}]copy[v_out]")
     full_video_filter = ";".join(video_filter_parts)
 
     # 3. Audio Filter Construction

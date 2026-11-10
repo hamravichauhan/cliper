@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import List, Optional
 from src.cliplocal.core.models import Word, CaptionStyleName
@@ -14,6 +15,25 @@ def hex_to_ass_color(hex_str: str, alpha: str = "00") -> str:
     g = clean[2:4]
     b = clean[4:6]
     return f"&H{alpha}{b}{g}{r}".upper()
+
+def get_semantic_color(word: str) -> Optional[str]:
+    """
+    Detect semantic keywords for viral kinetic text:
+    - Currency / Numbers / Metrics -> Mint Green (&H0088FF00&)
+    - High-stakes / Warnings / Superlatives -> Fire Red (&H00303BFF&)
+    """
+    clean = re.sub(r"[^\w$%]", "", word.lower())
+    if any(c.isdigit() for c in clean) or any(s in clean for s in ("$", "%")):
+        return "&H0088FF00&"  # Mint Green (#00FF88 in ASS BGR)
+
+    POWER_WORDS = {
+        "never", "always", "secret", "worst", "best", "insane", "crazy", "impossible",
+        "mistake", "dangerous", "destroy", "fail", "failure", "million", "billion",
+        "truth", "warning", "dead", "kill", "money", "rich", "broke"
+    }
+    if clean in POWER_WORDS:
+        return "&H00303BFF&"  # Fire Red (#FF3B30 in ASS BGR)
+    return None
 
 def escape_ass(text: str) -> str:
     """Escape ASS formatting control characters."""
@@ -43,7 +63,8 @@ def generate_ass_subtitles(
     include_emojis: bool = True,
     top_hook_headline: Optional[str] = None,
     top_hook_persistent: bool = False,
-    clip_duration: float = 30.0
+    clip_duration: float = 30.0,
+    semantic_highlighting: bool = True
 ) -> Path:
     """
     Generate an ASS subtitle file with animated word-level karaoke pop highlights
@@ -121,11 +142,17 @@ def generate_ass_subtitles(
                 if j == idx:
                     # Popping animation tag on active word
                     scale = style.highlight_scale
+                    pop_color = highlight_ass
+                    if semantic_highlighting:
+                        sem = get_semantic_color(w.word)
+                        if sem:
+                            pop_color = sem
+
                     if style.highlight_box_color:
                         box_color = hex_to_ass_color(style.highlight_box_color)
-                        tag = f"{{\\c{highlight_ass}\\3c{box_color}\\bord12\\fscx100\\fscy100\\t(0,70,\\fscx{scale}\\fscy{scale})}}{text_clean}{{\\r}}"
+                        tag = f"{{\\c{pop_color}\\3c{box_color}\\bord12\\fscx100\\fscy100\\t(0,70,\\fscx{scale}\\fscy{scale})}}{text_clean}{{\\r}}"
                     else:
-                        tag = f"{{\\c{highlight_ass}\\fscx100\\fscy100\\t(0,70,\\fscx{scale}\\fscy{scale})}}{text_clean}{{\\r}}"
+                        tag = f"{{\\c{pop_color}\\fscx100\\fscy100\\t(0,70,\\fscx{scale}\\fscy{scale})}}{text_clean}{{\\r}}"
                     formatted_words.append(tag)
                 else:
                     tag = f"{{\\c{primary_ass}}}{text_clean}{{\\r}}"

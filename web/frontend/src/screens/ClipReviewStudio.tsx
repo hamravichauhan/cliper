@@ -35,7 +35,10 @@ import {
   ShieldAlert,
   Music,
   ChevronRight,
-  Maximize2
+  Maximize2,
+  Zap,
+  Flame,
+  Activity
 } from 'lucide-react'
 
 export const ClipReviewStudio: React.FC = () => {
@@ -72,10 +75,17 @@ export const ClipReviewStudio: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Local inspector tab
-  const [inspectorTab, setInspectorTab] = useState<'details' | 'captions' | 'audio' | 'pipeline' | 'copy' | 'brand'>('details')
+  const [inspectorTab, setInspectorTab] = useState<'details' | 'polish' | 'captions' | 'audio' | 'pipeline' | 'copy' | 'brand'>('details')
   const [filterStatus, setFilterStatus] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // Post-Clip Viral Polish Micro-Edits State
+  const [retentionBar, setRetentionBar] = useState(true)
+  const [patternZoom, setPatternZoom] = useState(true)
+  const [semanticHighlight, setSemanticHighlight] = useState(true)
+  const [kineticSfx, setKineticSfx] = useState(true)
+  const [isPolishReRendering, setIsPolishReRendering] = useState(false)
 
   // Audio & Song overlay state
   const [clipMuteOriginal, setClipMuteOriginal] = useState(false)
@@ -108,6 +118,26 @@ export const ClipReviewStudio: React.FC = () => {
       next.add(idx)
     }
     setDeletedWordIndices(next)
+  }
+
+  const handleApplyPolish = async () => {
+    if (!clip) return
+    setIsPolishReRendering(true)
+    await reRenderCurrentClip(clip.id, {
+      retention_bar: retentionBar,
+      semantic_highlighting: semanticHighlight,
+      pattern_zoom: patternZoom,
+      include_sfx: kineticSfx,
+      background_music: clipAddSong,
+      mute_original: clipMuteOriginal,
+      music_track: clipSong,
+      music_volume: clipSongVolume / 100.0,
+      top_banner: topBanner,
+      reframe_mode: reframeMode,
+      auto_zoom: autoZoom,
+      multicam: multiCam
+    })
+    setIsPolishReRendering(false)
   }
 
   // Sync real video player with isPlaying
@@ -424,6 +454,18 @@ export const ClipReviewStudio: React.FC = () => {
                   {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}
                 </div>
               </button>
+
+              {/* Live Retention Progress Bar on Mobile Canvas */}
+              {retentionBar && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40 z-20 pointer-events-none">
+                  <div
+                    className="h-full bg-[#00FF88] shadow-[0_0_8px_#00FF88] transition-all duration-100 ease-linear"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, (currentTime / (clip.duration || 1)) * 100))}%`
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Scrubber & Playback Controls Bar */}
@@ -631,9 +673,10 @@ export const ClipReviewStudio: React.FC = () => {
             <Tabs
               tabs={[
                 { id: 'details', label: 'Details' },
+                { id: 'polish', label: 'Viral Polish' },
                 { id: 'captions', label: 'Captions' },
                 { id: 'audio', label: 'Audio' },
-                { id: 'pipeline', label: 'AI Pipeline' },
+                { id: 'pipeline', label: 'AI Reframing' },
                 { id: 'copy', label: 'Copy' },
                 { id: 'brand', label: 'Brand' }
               ]}
@@ -705,6 +748,124 @@ export const ClipReviewStudio: React.FC = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* TAB: POST-GENERATION VIRAL POLISH */}
+            {inspectorTab === 'polish' && (
+              <div className="space-y-4">
+                <div className="bg-[#18181B] border border-border rounded-card p-3 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-accent" />
+                    <h4 className="text-xs font-semibold text-text-primary">
+                      Post-Clip Viral Polish
+                    </h4>
+                  </div>
+                  <p className="text-[11px] text-text-secondary leading-relaxed">
+                    Fine-tune micro-edits on this generated clip to maximize audience completion rate and rewatch score.
+                  </p>
+                </div>
+
+                {/* 1. Retention Progress Bar */}
+                <div className="bg-[#18181B] border border-border rounded-card p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold text-text-primary block">
+                        3px Retention Progress Bar
+                      </span>
+                      <span className="text-[10px] text-text-muted">
+                        Stops viewer swipe-aways on mobile
+                      </span>
+                    </div>
+                    <Toggle checked={retentionBar} onChange={setRetentionBar} />
+                  </div>
+                  <p className="text-[11px] text-text-secondary">
+                    Burns a slim neon mint-green progress bar across the bottom. Viewers who see few seconds left finish the video.
+                  </p>
+                  {retentionBar && (
+                    <div className="pt-1.5 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-[#00FF88] shadow-[0_0_6px_#00FF88]" />
+                      <span className="text-[10px] font-mono text-[#00FF88]">Live Canvas Preview Active</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Pattern Interrupt Snap-Zooms */}
+                <div className="bg-[#18181B] border border-border rounded-card p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold text-text-primary block">
+                        Pattern Interrupt Snap-Zooms
+                      </span>
+                      <span className="text-[10px] text-text-muted">
+                        Cuts visual monotony every 3-5 seconds
+                      </span>
+                    </div>
+                    <Toggle checked={patternZoom} onChange={setPatternZoom} />
+                  </div>
+                  <p className="text-[11px] text-text-secondary">
+                    Applies sudden 1.18x punch-in cuts on key sentence transitions to reset the viewer's dopamine clock.
+                  </p>
+                </div>
+
+                {/* 3. Semantic Keyword Highlighting */}
+                <div className="bg-[#18181B] border border-border rounded-card p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold text-text-primary block">
+                        Semantic Keyword Highlighting
+                      </span>
+                      <span className="text-[10px] text-text-muted">
+                        Dynamic color pop on high-salience words
+                      </span>
+                    </div>
+                    <Toggle checked={semanticHighlight} onChange={setSemanticHighlight} />
+                  </div>
+                  <p className="text-[11px] text-text-secondary">
+                    Automatically colors currency & metrics in Mint Green, and alert words in Fire Red.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-[#00FF88]/15 text-[#00FF88] border border-[#00FF88]/30 font-mono font-semibold">
+                      $100K / 99% (Mint)
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-[#FF3B30]/15 text-[#FF3B30] border border-[#FF3B30]/30 font-mono font-semibold">
+                      Never / Mistake (Red)
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-[#FFEA00]/15 text-[#FFEA00] border border-[#FFEA00]/30 font-mono font-semibold">
+                      Action (Style Pop)
+                    </span>
+                  </div>
+                </div>
+
+                {/* 4. Kinetic Sound Effects */}
+                <div className="bg-[#18181B] border border-border rounded-card p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold text-text-primary block">
+                        Kinetic Micro-SFX Drops
+                      </span>
+                      <span className="text-[10px] text-text-muted">
+                        Auditory triggers on keyword hits
+                      </span>
+                    </div>
+                    <Toggle checked={kineticSfx} onChange={setKineticSfx} />
+                  </div>
+                  <p className="text-[11px] text-text-secondary">
+                    Plays procedurally generated 48kHz audio pops on key highlights, dings on stats, and subtle whooshes.
+                  </p>
+                </div>
+
+                {/* Action Button: Apply Polish & Re-Render */}
+                <Button
+                  variant="primary"
+                  size="md"
+                  className="w-full justify-center shadow-lg"
+                  icon={isPolishReRendering ? <RotateCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  disabled={isPolishReRendering}
+                  onClick={handleApplyPolish}
+                >
+                  {isPolishReRendering ? 'Burning Polish with VideoToolbox (~2s)...' : 'Apply Viral Polish & Re-Render'}
+                </Button>
               </div>
             )}
 

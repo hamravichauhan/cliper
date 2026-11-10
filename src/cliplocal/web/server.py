@@ -178,6 +178,9 @@ class ReRenderRequest(BaseModel):
     anti_copyright: bool = False
     broll: bool = False
     watermark: Optional[str] = None
+    retention_bar: bool = False
+    semantic_highlighting: bool = True
+    pattern_zoom: bool = True
 
 @app.post("/api/clips/re-render")
 async def re_render_clip(req: ReRenderRequest):
@@ -221,7 +224,11 @@ async def re_render_clip(req: ReRenderRequest):
         music_volume=req.music_volume,
         anti_copyright=req.anti_copyright,
         broll=req.broll,
-        extract_thumbnails=True
+        extract_thumbnails=True,
+        watermark=req.watermark,
+        retention_bar=req.retention_bar,
+        semantic_highlighting=req.semantic_highlighting,
+        pattern_zoom=req.pattern_zoom
     )
 
     return {"output_path": str(out_file), "candidate": candidate.model_dump()}
