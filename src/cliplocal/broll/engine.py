@@ -93,11 +93,13 @@ def find_broll_cutaways(
     clip_duration: float = 30.0,
     max_cutaways: int = 2,
     min_spacing: float = 8.0,
-    cutaway_duration: float = 2.4
+    cutaway_duration: float = 2.4,
+    use_stickers: bool = False
 ) -> List[BrollCutaway]:
     """
     Analyze words in clip, locate topic keywords, and schedule short B-roll cutaway windows.
     Protects opening hook (0 to 3.0s) and tail (last 1.5s).
+    If use_stickers is True, generates or fetches die-cut sticker pop PNGs.
     """
     if clip_duration < 8.0 or not words:
         return []
@@ -123,11 +125,20 @@ def find_broll_cutaways(
 
         clean_w = re.sub(r"[^\w]", "", w.word.lower())
         tag = word_to_tag.get(clean_w)
-        if tag:
-            asset = find_broll_for_tag(tag)
+        if tag or use_stickers:
+            asset = None
+            if use_stickers:
+                try:
+                    from src.cliplocal.broll.scraper import get_sticker_for_transcript_snippet
+                    asset = get_sticker_for_transcript_snippet(clean_w)
+                except Exception:
+                    asset = None
+            if not asset and tag:
+                asset = find_broll_for_tag(tag)
+
             if asset:
                 cutaways.append(BrollCutaway(
-                    tag=tag,
+                    tag=tag or "sticker",
                     t_start=rel_start,
                     t_end=rel_end,
                     asset_path=str(asset),

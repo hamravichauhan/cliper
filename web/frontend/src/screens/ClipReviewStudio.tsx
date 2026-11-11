@@ -80,10 +80,72 @@ export const ClipReviewStudio: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Local inspector tab
-  const [inspectorTab, setInspectorTab] = useState<'details' | 'polish' | 'captions' | 'audio' | 'pipeline' | 'copy' | 'brand' | 'podcast_qa'>('details')
+  const [inspectorTab, setInspectorTab] = useState<'style_dna' | 'podcast_qa' | 'details' | 'polish' | 'captions' | 'audio' | 'pipeline' | 'copy' | 'brand'>('details')
   const [filterStatus, setFilterStatus] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // Creator Style DNA & Studio Switcher State
+  const [availableStyles, setAvailableStyles] = useState<any[]>([])
+  const [studioStyleProfile, setStudioStyleProfile] = useState<string>('raj_shamani')
+  const [studioSoundSuite, setStudioSoundSuite] = useState<string>('tension_drone')
+  const [studioFrequencyCarving, setStudioFrequencyCarving] = useState<boolean>(true)
+  const [studioReframeMode, setStudioReframeMode] = useState<string>('podcast_reaction_split')
+  const [studioTeaserStitch, setStudioTeaserStitch] = useState<boolean>(false)
+  const [studioUseStickers, setStudioUseStickers] = useState<boolean>(true)
+  const [isReRenderingWithStyle, setIsReRenderingWithStyle] = useState<boolean>(false)
+
+  const fetchAvailableStyles = async () => {
+    try {
+      const res = await fetch('/api/styles')
+      if (res.ok) {
+        const data = await res.json()
+        setAvailableStyles(data)
+      }
+    } catch (e) {
+      console.error('Failed to load styles:', e)
+    }
+  }
+
+  useEffect(() => {
+    fetchAvailableStyles()
+  }, [])
+
+  const handleApplyStudioStyle = async (overrideProfile?: string, overrideSound?: string) => {
+    if (!clip) return
+    const prof = overrideProfile || studioStyleProfile
+    const sound = overrideSound || studioSoundSuite
+    setIsReRenderingWithStyle(true)
+    try {
+      const success = await reRenderCurrentClip(clip.id, {
+        style_profile: prof,
+        music_track: sound,
+        background_music: sound !== 'none',
+        frequency_carving: studioFrequencyCarving,
+        reframe_mode: studioReframeMode,
+        podcast_reaction_split: studioReframeMode === 'podcast_reaction_split',
+        teaser_stitch: studioTeaserStitch,
+        broll: studioUseStickers,
+        use_stickers: studioUseStickers
+      })
+      if (success) {
+        addToast({
+          title: 'Style DNA Applied',
+          description: `Clip re-rendered with ${prof.replace('_', ' ')} visual DNA and ${sound.replace('_', ' ')} sound suite!`,
+          type: 'success'
+        })
+      }
+    } catch (err) {
+      console.error('Failed to apply style DNA:', err)
+      addToast({
+        title: 'Render Error',
+        description: 'Failed to apply style profile to clip.',
+        type: 'danger'
+      })
+    } finally {
+      setIsReRenderingWithStyle(false)
+    }
+  }
 
   // Podcast Q&A Manifest State
   const [qaManifest, setQaManifest] = useState<any>(null)
@@ -514,7 +576,75 @@ export const ClipReviewStudio: React.FC = () => {
           </div>
 
           {/* Player + Controls Container */}
-          <div className="p-4 flex flex-col items-center justify-center space-y-4">
+          <div className="p-4 flex flex-col items-center justify-center space-y-3">
+            {/* Quick 1-Click Style DNA & Sound Suite Switcher Bar */}
+            <div className="w-full max-w-xl bg-[#141416] border border-border/80 rounded-control p-2 px-3 flex items-center justify-between gap-2 shadow-sm text-xs">
+              <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none">
+                <span className="text-[10px] font-bold text-accent uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-accent" /> Style DNA:
+                </span>
+                {[
+                  { id: 'raj_shamani', name: 'Raj Shamani', icon: '🌟' },
+                  { id: 'alex_hormozi', name: 'Hormozi', icon: '⚡' },
+                  { id: 'ali_abdaal', name: 'Ali Abdaal', icon: '🌊' }
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setStudioStyleProfile(p.id)
+                      setInspectorTab('style_dna')
+                    }}
+                    className={`px-2.5 py-1 rounded-control text-[11px] font-medium transition-all shrink-0 flex items-center gap-1 border ${
+                      studioStyleProfile === p.id
+                        ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs'
+                        : 'bg-[#18181B] border-border text-text-secondary hover:text-text-primary hover:border-[#3F3F46]'
+                    }`}
+                  >
+                    <span>{p.icon}</span>
+                    <span>{p.name}</span>
+                  </button>
+                ))}
+
+                <span className="h-3 w-px bg-border/80 shrink-0 mx-1" />
+
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+                  <Music className="w-3 h-3 text-text-muted" /> Suite:
+                </span>
+                {[
+                  { id: 'tension_drone', name: 'Tension', icon: '🎙️' },
+                  { id: 'emotional_piano', name: 'Emotional', icon: '🎹' },
+                  { id: 'ambient_lofi', name: 'Lo-Fi', icon: '🎵' }
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      setStudioSoundSuite(s.id)
+                      setInspectorTab('style_dna')
+                    }}
+                    className={`px-2 py-1 rounded-control text-[11px] font-medium transition-all shrink-0 flex items-center gap-1 border ${
+                      studioSoundSuite === s.id
+                        ? 'bg-accent/15 border-accent text-accent font-semibold shadow-xs'
+                        : 'bg-[#18181B] border-border text-text-secondary hover:text-text-primary hover:border-[#3F3F46]'
+                    }`}
+                  >
+                    <span>{s.icon}</span>
+                    <span>{s.name}</span>
+                  </button>
+                ))}
+              </div>
+
+              <Button
+                variant="primary"
+                size="sm"
+                className="shrink-0 text-xs py-1 h-7"
+                icon={<Sparkles className="w-3 h-3" />}
+                loading={isReRenderingWithStyle}
+                onClick={() => handleApplyStudioStyle()}
+              >
+                Apply Style
+              </Button>
+            </div>
+
             {/* 9:16 Mobile Player Canvas */}
             <div className="relative w-[300px] h-[533px] bg-black rounded-card border border-border shadow-2xl overflow-hidden select-none group">
               {clip.videoUrl ? (
@@ -766,8 +896,9 @@ export const ClipReviewStudio: React.FC = () => {
           <div className="p-2 border-b border-border bg-bg-surface">
             <Tabs
               tabs={[
-                { id: 'details', label: 'Details' },
+                { id: 'style_dna', label: '🧬 Style DNA' },
                 { id: 'podcast_qa', label: '🎙️ Q&A Index' },
+                { id: 'details', label: 'Details' },
                 { id: 'polish', label: 'Hook & Polish' },
                 { id: 'captions', label: 'Captions' },
                 { id: 'audio', label: 'Audio' },
@@ -782,6 +913,253 @@ export const ClipReviewStudio: React.FC = () => {
 
           {/* Inspector Body */}
           <div className="flex-1 overflow-y-auto p-4 space-y-5">
+            {/* TAB: STYLE DNA & PODCAST SOUND SUITE */}
+            {inspectorTab === 'style_dna' && (
+              <div className="space-y-4">
+                {/* Header Card */}
+                <div className="p-3 bg-gradient-to-r from-accent/15 via-[#18181B] to-[#18181B] border border-accent/30 rounded-card space-y-1">
+                  <div className="flex items-center gap-2 text-accent font-semibold text-xs">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Creator Style DNA & Audio Engine</span>
+                  </div>
+                  <p className="text-[11px] text-text-secondary leading-relaxed">
+                    1-Click apply viral visual cadence, procedural frequency-carved sound suites, and dual-speaker reaction split.
+                  </p>
+                </div>
+
+                {/* Section 1: Creator Style DNA Presets */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-text-primary">
+                    1. Creator Visual DNA Presets
+                  </label>
+                  <div className="space-y-2">
+                    {[
+                      {
+                        id: 'raj_shamani',
+                        name: 'Raj Shamani Signature',
+                        handle: '@rajshamani',
+                        desc: 'Golden-yellow boxed pill, 2.0s fast cadence, floating stickers with shadow, whoosh cuts',
+                        accent: '#FFD700',
+                        icon: '🌟'
+                      },
+                      {
+                        id: 'alex_hormozi',
+                        name: 'Alex Hormozi Hyper-Retention',
+                        handle: '@hormozi',
+                        desc: 'Electric emerald pop, ultra-fast 1.7s snap zoom, heavy black outlines, sub drops',
+                        accent: '#00FF66',
+                        icon: '⚡'
+                      },
+                      {
+                        id: 'ali_abdaal',
+                        name: 'Ali Abdaal Minimalist',
+                        handle: '@aliabdaal',
+                        desc: 'Clean sky-blue text, 2.6s calm pacing, soft pastel stickers, gentle background music',
+                        accent: '#38BDF8',
+                        icon: '🌊'
+                      },
+                      ...availableStyles
+                        .filter((p) => !['raj_shamani', 'alex_hormozi', 'ali_abdaal'].includes(p.id))
+                        .map((p) => ({
+                          id: p.id,
+                          name: p.name,
+                          handle: p.creator_handle || '@custom',
+                          desc: p.description || 'Custom cloned creator profile',
+                          accent: p.typography?.highlight_color || '#00F0FF',
+                          icon: '🧬'
+                        }))
+                    ].map((prof) => {
+                      const isSelected = studioStyleProfile === prof.id
+                      return (
+                        <div
+                          key={prof.id}
+                          onClick={() => setStudioStyleProfile(prof.id)}
+                          className={`p-3 rounded-card border cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-bg-elevated border-accent ring-1 ring-accent/30 shadow-sm'
+                              : 'bg-[#141416] border-border hover:border-[#3F3F46]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-1.5 font-semibold text-xs text-text-primary">
+                              <span>{prof.icon}</span>
+                              <span>{prof.name}</span>
+                            </div>
+                            <span
+                              className="w-2.5 h-2.5 rounded-full border border-black/40"
+                              style={{ backgroundColor: prof.accent }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-text-muted leading-relaxed">{prof.desc}</p>
+                          <div className="mt-1.5 flex items-center justify-between text-[9px] text-text-muted">
+                            <span className="font-mono">{prof.handle}</span>
+                            {isSelected && (
+                              <Badge variant="accent" size="sm">
+                                Selected
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Section 2: Podcast Sound Suites & Vocal Carving */}
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
+                      <Music className="w-3.5 h-3.5 text-accent" />
+                      2. Podcast Sound Suite (Content-ID Safe)
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {[
+                      {
+                        id: 'tension_drone',
+                        name: '🎙️ Podcast Tension Drone',
+                        desc: '40Hz sub-bass pulse + D-minor drone pad with 48 BPM heartbeat swell for revelations & debates'
+                      },
+                      {
+                        id: 'emotional_piano',
+                        name: '🎹 Emotional Piano & Cello',
+                        desc: 'Am/F/C minor chords with piano hammer decay and warm sustained cello body for confessions'
+                      },
+                      {
+                        id: 'ambient_lofi',
+                        name: '🎵 Chill Lo-Fi Chords',
+                        desc: 'Warm Rhodes 4-chord progression and vinyl warmth for wisdom and calm stories'
+                      },
+                      {
+                        id: 'phonk_drift',
+                        name: '⚡ Phonk Drift (Gym / 808)',
+                        desc: '135 BPM distorted 808 sub-bass with cowbell harmonics for high-energy motivation'
+                      },
+                      {
+                        id: 'none',
+                        name: '🔇 Video Audio Only',
+                        desc: 'No background music, keeping original speaker acoustics clean'
+                      }
+                    ].map((suite) => {
+                      const isSelected = studioSoundSuite === suite.id
+                      return (
+                        <div
+                          key={suite.id}
+                          onClick={() => setStudioSoundSuite(suite.id)}
+                          className={`p-2 rounded-control border cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-bg-elevated border-accent ring-1 ring-accent/30'
+                              : 'bg-[#141416] border-border hover:border-[#3F3F46]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-text-primary">{suite.name}</span>
+                            {isSelected && <Badge variant="accent" size="sm">Active</Badge>}
+                          </div>
+                          <p className="text-[10px] text-text-muted mt-0.5">{suite.desc}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Vocal Clarity Notch Toggle */}
+                  <div className="p-2.5 bg-[#18181B] border border-border/80 rounded-control mt-2">
+                    <Toggle
+                      label="🎙️ 2.4kHz Vocal Clarity Notch"
+                      description="Applies an EQ notch to background music at 2.4kHz to prevent clashing with human vocal clarity."
+                      checked={studioFrequencyCarving}
+                      onChange={setStudioFrequencyCarving}
+                    />
+                  </div>
+                </div>
+
+                {/* Section 3: Camera Framing & Reaction Split */}
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <label className="block text-xs font-semibold text-text-primary">
+                    3. Podcast Camera Framing & Reaction
+                  </label>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {[
+                      {
+                        id: 'podcast_reaction_split',
+                        name: '🎙️ Dynamic Split Reaction',
+                        desc: 'Dual Host/Guest split for 3.2s question, then snaps seamlessly to guest face-follow'
+                      },
+                      {
+                        id: 'face_follow',
+                        name: '👤 Single Face Follow (9:16)',
+                        desc: 'Smooth vertical face centering focused on the primary speaker'
+                      },
+                      {
+                        id: 'split_stacked',
+                        name: '🎬 Split Stacked (50/50)',
+                        desc: 'Continuous stacked layout showing host on top and guest on bottom throughout clip'
+                      },
+                      {
+                        id: 'blur_fill',
+                        name: '🖼️ Blur Fill (16:9 in 9:16)',
+                        desc: 'Full horizontal frame centered with blurred background fill'
+                      }
+                    ].map((mode) => {
+                      const isSelected = studioReframeMode === mode.id
+                      return (
+                        <div
+                          key={mode.id}
+                          onClick={() => setStudioReframeMode(mode.id)}
+                          className={`p-2 rounded-control border cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-bg-elevated border-accent ring-1 ring-accent/30'
+                              : 'bg-[#141416] border-border hover:border-[#3F3F46]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-text-primary">{mode.name}</span>
+                            {isSelected && <Badge variant="accent" size="sm">Active</Badge>}
+                          </div>
+                          <p className="text-[10px] text-text-muted mt-0.5">{mode.desc}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Section 4: Hook Optimization & Neural Stickers */}
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <label className="block text-xs font-semibold text-text-primary">
+                    4. Hook Optimization & Overlays
+                  </label>
+                  <div className="p-2.5 bg-[#18181B] border border-border/80 rounded-control space-y-3">
+                    <Toggle
+                      label="⚡ Cold Open Climax Teaser"
+                      description="Stitch 1.5s climax punchline before question separated by whoosh stinger."
+                      checked={studioTeaserStitch}
+                      onChange={setStudioTeaserStitch}
+                    />
+                    <Toggle
+                      label="🏷️ Floating Die-Cut Stickers"
+                      description="Pop entity cutout stickers with 4px white outline and soft drop shadow."
+                      checked={studioUseStickers}
+                      onChange={setStudioUseStickers}
+                    />
+                  </div>
+                </div>
+
+                {/* Action CTA */}
+                <div className="pt-2">
+                  <Button
+                    variant="primary"
+                    size="md"
+                    className="w-full shadow-lg shadow-accent/20"
+                    icon={<Sparkles className="w-4 h-4" />}
+                    loading={isReRenderingWithStyle}
+                    onClick={() => handleApplyStudioStyle()}
+                  >
+                    ⚡ Apply Style DNA & Re-render Clip
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* TAB 1: DETAILS */}
             {inspectorTab === 'details' && (
               <div className="space-y-5">

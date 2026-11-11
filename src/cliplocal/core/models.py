@@ -9,6 +9,7 @@ class ReframeMode(str, Enum):
     FACE_FOLLOW = "face_follow"
     ACTIVE_SPEAKER = "active_speaker"
     SPLIT_STACKED = "split_stacked"
+    PODCAST_REACTION_SPLIT = "podcast_reaction_split"
     AUTO = "auto"
 
 class CaptionStyleName(str, Enum):

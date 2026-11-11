@@ -64,7 +64,10 @@ def render_candidate_clip(
     hook_stinger_type: str = "whoosh",
     hook_snap_zoom: bool = True,
     teaser_stitch: bool = False,
-    hook_headline: Optional[str] = None
+    hook_headline: Optional[str] = None,
+    frequency_carving: bool = True,
+    reaction_split_duration: float = 3.0,
+    use_stickers: bool = False
 ) -> Path:
     """
     Render a short clip with 9:16 framing, simulated multi-cam cuts, burned-in ASS captions,
@@ -150,7 +153,17 @@ def render_candidate_clip(
     next_input_idx = 1
 
     # Base Crop with Multi-Cam, Auto-Zoom or Pattern Interrupt Zooms
-    if effective_mode in (ReframeMode.FACE_FOLLOW, ReframeMode.CENTER):
+    if effective_mode == ReframeMode.PODCAST_REACTION_SPLIT:
+        base_crop = build_crop_filter(
+            mode=ReframeMode.PODCAST_REACTION_SPLIT,
+            in_w=in_w,
+            in_h=in_h,
+            out_w=1080,
+            out_h=1920,
+            center_x_ratio=center_x,
+            reaction_split_duration=reaction_split_duration
+        )
+    elif effective_mode in (ReframeMode.FACE_FOLLOW, ReframeMode.CENTER):
         if (multicam or pattern_zoom or auto_zoom or hook_snap_zoom) and candidate.sentences:
             intervals = compute_multicam_intervals(
                 candidate.duration,
@@ -212,7 +225,8 @@ def render_candidate_clip(
             words=candidate.words,
             time_offset=candidate.start,
             clip_duration=candidate.duration,
-            max_cutaways=2
+            max_cutaways=2,
+            use_stickers=use_stickers
         )
         for i, cut in enumerate(cutaways):
             extra_inputs.append(cut.asset_path)
@@ -221,12 +235,21 @@ def render_candidate_clip(
             scaled_label = f"broll_sc_{i}"
             next_v_label = f"v_broll_{i}"
 
-            video_filter_parts.append(
-                f"[{broll_in_idx}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[{scaled_label}]"
-            )
-            video_filter_parts.append(
-                f"[{curr_v_label}][{scaled_label}]overlay=0:0:enable='between(t,{cut.t_start:.2f},{cut.t_end:.2f})'[{next_v_label}]"
-            )
+            is_sticker = "sticker" in cut.asset_path.lower() or cut.asset_path.lower().endswith(".png")
+            if is_sticker:
+                video_filter_parts.append(
+                    f"[{broll_in_idx}:v]scale=380:380:force_original_aspect_ratio=decrease[{scaled_label}]"
+                )
+                video_filter_parts.append(
+                    f"[{curr_v_label}][{scaled_label}]overlay=(W-w)/2:320:enable='between(t,{cut.t_start:.2f},{cut.t_end:.2f})'[{next_v_label}]"
+                )
+            else:
+                video_filter_parts.append(
+                    f"[{broll_in_idx}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[{scaled_label}]"
+                )
+                video_filter_parts.append(
+                    f"[{curr_v_label}][{scaled_label}]overlay=0:0:enable='between(t,{cut.t_start:.2f},{cut.t_end:.2f})'[{next_v_label}]"
+                )
             curr_v_label = next_v_label
 
     # Optional Anti-Copyright Transformative Video Filter
@@ -322,7 +345,8 @@ def render_candidate_clip(
             music_input_index=music_input_idx,
             duck_threshold=0.08,
             duck_ratio=8.0,
-            music_volume=music_volume or 0.22
+            music_volume=music_volume or 0.22,
+            frequency_carving=frequency_carving
         )
         audio_filter_parts.append(duck_filter)
         current_audio_label = "a_mixed"

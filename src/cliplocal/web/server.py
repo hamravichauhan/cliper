@@ -190,6 +190,10 @@ class ReRenderRequest(BaseModel):
     hook_snap_zoom: bool = True
     teaser_stitch: bool = False
     hook_headline: Optional[str] = None
+    style_profile: Optional[str] = None
+    frequency_carving: bool = True
+    podcast_reaction_split: bool = False
+    use_stickers: bool = False
 
 @app.post("/api/clips/re-render")
 def re_render_clip(req: ReRenderRequest):
@@ -207,8 +211,41 @@ def re_render_clip(req: ReRenderRequest):
     candidate.duration = req.end - req.start
     if req.title is not None:
         candidate.title = req.title
+
+    effective_reframe = ReframeMode(req.reframe_mode) if req.reframe_mode in [e.value for e in ReframeMode] else ReframeMode.CENTER
+    if req.podcast_reaction_split or req.reframe_mode == "podcast_reaction_split":
+        effective_reframe = ReframeMode.PODCAST_REACTION_SPLIT
+    candidate.reframe_mode = effective_reframe
+
     candidate.caption_style = CaptionStyleName(req.caption_style) if req.caption_style in [e.value for e in CaptionStyleName] else CaptionStyleName.HORMOZI
-    candidate.reframe_mode = ReframeMode(req.reframe_mode) if req.reframe_mode in [e.value for e in ReframeMode] else ReframeMode.CENTER
+
+    use_stickers = req.use_stickers
+    use_broll = req.broll
+    use_track = req.music_track
+    use_bg_music = req.background_music
+    use_sfx = req.include_sfx
+    use_zoom = req.auto_zoom
+
+    if req.style_profile:
+        from src.cliplocal.styles.manager import get_style_profile
+        prof = get_style_profile(req.style_profile)
+        if prof:
+            if prof.id == "raj_shamani":
+                candidate.caption_style = CaptionStyleName.BOXED
+            elif prof.id == "alex_hormozi":
+                candidate.caption_style = CaptionStyleName.HORMOZI
+            elif prof.id == "ali_abdaal":
+                candidate.caption_style = CaptionStyleName.MINIMAL
+
+            if prof.graphics.enabled:
+                use_broll = True
+                if prof.graphics.overlay_type == "die_cut_sticker":
+                    use_stickers = True
+            if prof.audio.bg_music_track:
+                use_bg_music = True
+                use_track = prof.audio.bg_music_track
+            use_sfx = prof.audio.whoosh_on_cuts
+            use_zoom = prof.rhythm.snap_zoom_on_emphasis
 
     # Filter words if autocut deletion was applied
     if req.deleted_words and candidate.words:
@@ -222,17 +259,17 @@ def re_render_clip(req: ReRenderRequest):
         output_dir=output_dir,
         metadata=job.metadata,
         reframe_mode=candidate.reframe_mode,
-        auto_zoom=req.auto_zoom,
+        auto_zoom=use_zoom,
         multicam=req.multicam,
         top_banner=req.top_banner,
         include_emojis=req.include_emojis,
-        include_sfx=req.include_sfx,
-        background_music=req.background_music,
+        include_sfx=use_sfx,
+        background_music=use_bg_music,
         mute_original=req.mute_original,
-        music_track=req.music_track,
+        music_track=use_track,
         music_volume=req.music_volume,
         anti_copyright=req.anti_copyright,
-        broll=req.broll,
+        broll=use_broll,
         extract_thumbnails=True,
         watermark=req.watermark,
         retention_bar=req.retention_bar,
@@ -243,7 +280,10 @@ def re_render_clip(req: ReRenderRequest):
         hook_stinger_type=req.hook_stinger_type,
         hook_snap_zoom=req.hook_snap_zoom,
         teaser_stitch=req.teaser_stitch,
-        hook_headline=req.hook_headline
+        hook_headline=req.hook_headline,
+        frequency_carving=req.frequency_carving,
+        reaction_split_duration=3.2,
+        use_stickers=use_stickers
     )
 
     return {"output_path": str(out_file), "candidate": candidate.model_dump()}
@@ -392,6 +432,9 @@ async def render_question_on_demand(job_id: str, qa_id: int):
 
     from src.cliplocal.core.models import CandidateClip, ScoreBreakdown, ReframeMode, CaptionStyleName
     from src.cliplocal.render.engine import render_candidate_clip
+    from src.cliplocal.audio.music import get_podcast_sound_suite_for_archetype
+
+    sound_suite = get_podcast_sound_suite_for_archetype(target_q.get("viral_archetype", "contrarian_truth"))
 
     output_dir = manifest_path.parent
     clip_index = len(job.candidates) + 1
@@ -413,8 +456,8 @@ async def render_question_on_demand(job_id: str, qa_id: int):
         title=target_q.get("hook_headline", target_q["question_text"][:50]),
         caption=target_q.get("social_caption", target_q["question_text"]),
         hashtags=target_q.get("hashtags", ["#podcast", "#shorts"]),
-        reframe_mode=ReframeMode.AUTO,
-        caption_style=CaptionStyleName.HORMOZI,
+        reframe_mode=ReframeMode.PODCAST_REACTION_SPLIT,
+        caption_style=CaptionStyleName.BOXED,
         top_banner=False,
         multicam=True
     )
@@ -425,12 +468,19 @@ async def render_question_on_demand(job_id: str, qa_id: int):
         candidate=new_candidate,
         output_dir=output_dir,
         metadata=job.metadata,
-        reframe_mode=ReframeMode.AUTO,
+        reframe_mode=ReframeMode.PODCAST_REACTION_SPLIT,
         auto_zoom=True,
         multicam=True,
         top_banner=False,
         include_emojis=True,
         include_sfx=True,
+        background_music=True,
+        music_track=sound_suite,
+        music_volume=0.20,
+        frequency_carving=True,
+        reaction_split_duration=3.2,
+        broll=True,
+        use_stickers=True,
         extract_thumbnails=True
     )
 

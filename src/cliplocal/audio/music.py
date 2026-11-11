@@ -9,8 +9,29 @@ MUSIC_PRESETS = {
     "ambient_lofi": "ambient_lofi.wav",
     "phonk_drift": "phonk_drift.wav",
     "synthwave": "synthwave.wav",
-    "cinematic": "cinematic.wav"
+    "cinematic": "cinematic.wav",
+    "tension_drone": "tension_drone.wav",
+    "emotional_piano": "emotional_piano.wav"
 }
+
+ARCHETYPE_SUITE_MAP = {
+    "contrarian_truth": "tension_drone",
+    "conflict_debate": "tension_drone",
+    "shocking_revelation": "tension_drone",
+    "conspiracy_theory": "tension_drone",
+    "insider_secret": "tension_drone",
+    "story_metaphor": "emotional_piano",
+    "emotional_vulnerability": "emotional_piano",
+    "actionable_framework": "emotional_piano",
+    "life_lesson": "emotional_piano",
+    "counter_intuitive": "ambient_lofi",
+    "humor_roast": "ambient_lofi"
+}
+
+def get_podcast_sound_suite_for_archetype(archetype: str) -> str:
+    """Map viral question archetype to optimal background sound suite."""
+    clean = archetype.lower().strip()
+    return ARCHETYPE_SUITE_MAP.get(clean, "tension_drone")
 
 def ensure_ambient_music(genre: str = "ambient_lofi") -> Path:
     """Procedurally synthesize royalty-free background music loops (lo-fi, phonk, synthwave, cinematic)."""
@@ -73,6 +94,39 @@ def ensure_ambient_music(genre: str = "ambient_lofi") -> Path:
             swell = 0.8 + 0.2 * np.sin(2 * np.pi * 0.15 * t_val)
             wave[i] = (sub + tension + fifth) * swell * 0.35
 
+    elif clean_genre == "tension_drone":
+        # Podcast Tension Drone: 40Hz sub-bass pulse + D-minor drone pad with slow 0.8Hz heartbeat swell
+        d_freq = 73.42 # D2 root
+        for i, t_val in enumerate(t):
+            sub = np.sin(2 * np.pi * 40.0 * t_val) * 0.32
+            drone = np.sin(2 * np.pi * d_freq * t_val) * 0.22
+            tension = np.sin(2 * np.pi * (d_freq * 1.2) * t_val) * 0.12 # minor 3rd (F2)
+            dissonance = np.sin(2 * np.pi * (d_freq * 1.414) * t_val) * 0.08 # tritone / flat 5
+            heartbeat = 0.85 + 0.15 * np.sin(2 * np.pi * 0.8 * t_val) # 48 BPM pulse
+            wave[i] = (sub + drone + tension + dissonance) * heartbeat * 0.34
+
+    elif clean_genre == "emotional_piano":
+        # Podcast Emotional Piano: Minor chords (Am, F, C, Em) with piano hammer decay and warm cello sustain
+        chords = [
+            [110.0, 130.81, 164.81], # Am
+            [87.31, 110.0, 130.81],  # F
+            [65.41, 98.0, 130.81],   # C
+            [82.41, 123.47, 164.81]  # Em
+        ]
+        chord_dur = 7.5
+        for i, t_val in enumerate(t):
+            chord_idx = int((t_val % (chord_dur * len(chords))) // chord_dur)
+            t_in_chord = t_val % chord_dur
+            decay = np.exp(-1.8 * (t_in_chord / chord_dur))
+            freqs = chords[chord_idx]
+            piano_strike = 0.0
+            cello_sustain = 0.0
+            for f in freqs:
+                piano_strike += (np.sin(2 * np.pi * f * 2 * t_val) * 0.18 + np.sin(2 * np.pi * f * 4 * t_val) * 0.06) * decay
+                cello_sustain += np.sin(2 * np.pi * f * t_val) * 0.12
+            vibrato = 1.0 + 0.08 * np.sin(2 * np.pi * 4.5 * t_val)
+            wave[i] = (piano_strike + cello_sustain * vibrato) * 0.35
+
     else:
         # Default: ambient_lofi 4-chord progression: Cmaj7, Am7, Fmaj7, G7
         chords = [
@@ -108,12 +162,22 @@ def build_ducking_audio_filter(
     music_input_index: int = 1,
     duck_threshold: float = 0.08,
     duck_ratio: float = 8.0,
-    music_volume: float = 0.22
+    music_volume: float = 0.22,
+    frequency_carving: bool = False
 ) -> str:
     """
     Build FFmpeg sidechaincompress filter snippet for automatic music ducking.
     Ducks music volume when speaker is vocal, smoothly brings it up in pauses.
+    If frequency_carving is True, applies a -4.5 dB EQ notch at 2.4 kHz so human speech cuts through cleanly.
     """
+    if frequency_carving:
+        carved_label = f"carved_bg_{music_input_index}"
+        return (
+            f"[{music_input_index}:a]equalizer=f=2400:t=q:w=1.2:g=-4.5[{carved_label}];"
+            f"[{carved_label}][{main_audio_label}]sidechaincompress="
+            f"threshold={duck_threshold}:ratio={duck_ratio}:attack=20:release=250[ducked_bg];"
+            f"[{main_audio_label}][ducked_bg]amix=inputs=2:weights=1.0 {music_volume}[a_mixed]"
+        )
     return (
         f"[{music_input_index}:a][{main_audio_label}]sidechaincompress="
         f"threshold={duck_threshold}:ratio={duck_ratio}:attack=20:release=250[ducked_bg];"

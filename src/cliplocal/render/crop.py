@@ -6,7 +6,8 @@ def build_crop_filter(
     in_h: int = 1080,
     out_w: int = 1080,
     out_h: int = 1920,
-    center_x_ratio: float = 0.5
+    center_x_ratio: float = 0.5,
+    reaction_split_duration: float = 3.0
 ) -> str:
     """
     Build FFmpeg filtergraph snippet for reframing horizontal video into vertical 9:16.
@@ -18,6 +19,24 @@ def build_crop_filter(
             f"[bg]scale={out_w}:{out_h}:force_original_aspect_ratio=increase,crop={out_w}:{out_h},boxblur=20:5[bg_blur];"
             f"[fg]scale={out_w}:-1[fg_scaled];"
             f"[bg_blur][fg_scaled]overlay=(W-w)/2:(H-h)/2[v_reframed]"
+        )
+    elif mode == ReframeMode.PODCAST_REACTION_SPLIT:
+        # Dual-speaker reaction split: Top panel Host + Bottom panel Guest for initial 3s, then snap to guest face
+        crop_w = int(in_h * 9 / 16)
+        if crop_w % 2 != 0:
+            crop_w -= 1
+        crop_h = in_h
+        panel_h = out_h // 2
+        x_left = max(0, min(in_w - crop_w, int(in_w * 0.25 - crop_w // 2)))
+        x_right = max(0, min(in_w - crop_w, int(in_w * 0.75 - crop_w // 2)))
+        x_guest = max(0, min(in_w - crop_w, int(in_w * center_x_ratio - crop_w // 2)))
+        return (
+            f"[0:v]split=3[v_host][v_guest_react][v_guest_full];"
+            f"[v_host]crop={crop_w}:{crop_h}:{x_left}:0,scale={out_w}:{panel_h}[top_panel];"
+            f"[v_guest_react]crop={crop_w}:{crop_h}:{x_right}:0,scale={out_w}:{panel_h}[bottom_panel];"
+            f"[top_panel][bottom_panel]vstack[v_split_stack];"
+            f"[v_guest_full]crop={crop_w}:{crop_h}:{x_guest}:0,scale={out_w}:{out_h}[v_full_guest];"
+            f"[v_full_guest][v_split_stack]overlay=0:0:enable='lte(t,{reaction_split_duration:.2f})'[v_reframed]"
         )
     elif mode == ReframeMode.SPLIT_STACKED:
         # Mode E: Split stacked 2-speaker vertical layout (two 1080x960 panels stacked)

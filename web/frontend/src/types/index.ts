@@ -156,6 +156,22 @@ export const SONG_PRESETS: SongOption[] = [
     desc: 'Deep sub-bass drone with rising string swells for dramatic payoffs',
     bpm: 90,
     icon: '🎬'
+  },
+  {
+    id: 'tension_drone',
+    name: 'Podcast Tension Drone',
+    genre: 'Podcast / Suspense',
+    desc: '40Hz sub-bass pulse & D-minor pad with 48 BPM heartbeat swell for debates & controversies',
+    bpm: 72,
+    icon: '🎙️'
+  },
+  {
+    id: 'emotional_piano',
+    name: 'Emotional Piano & Cello',
+    genre: 'Podcast / Vulnerable',
+    desc: 'Melancholic Am/F/C minor chords with warm sustained cello body for confessions & life lessons',
+    bpm: 68,
+    icon: '🎹'
   }
 ]
 

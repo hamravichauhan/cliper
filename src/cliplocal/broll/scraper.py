@@ -122,9 +122,9 @@ def convert_to_die_cut_sticker(
     """
     Transform raw image into a 'Raj Shamani / Ali Abdaal' style Die-Cut Sticker:
     - Scales subject
-    - Generates circular/rounded vignette mask
+    - Isolates foreground silhouette (or creates smooth rounded die-cut mask)
     - Dilates thick solid white stroke border
-    - Applies soft drop shadow
+    - Applies soft drop shadow behind border
     """
     STICKERS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     out_sticker = STICKERS_CACHE_DIR / f"sticker_{image_path.stem}.png"
@@ -135,34 +135,88 @@ def convert_to_die_cut_sticker(
     if raw is None:
         return generate_procedural_sticker_fallback(image_path.stem, target_size)
 
-    # Convert to 4-channel BGRA
-    if raw.shape[2] == 3:
+    # Convert to 4-channel BGRA if RGB
+    if len(raw.shape) == 2:
+        raw = cv2.cvtColor(raw, cv2.COLOR_GRAY2BGRA)
+    elif raw.shape[2] == 3:
         b, g, r = cv2.split(raw)
-        alpha = np.ones(b.shape, dtype=b.dtype) * 255
+        # Check corners to detect uniform white/light background
+        corner_pixels = np.array([raw[0, 0], raw[0, -1], raw[-1, 0], raw[-1, -1]])
+        corner_mean = np.mean(corner_pixels)
+        if corner_mean > 225:
+            # Uniform white background: mask out pure white/light grey
+            gray = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY)
+            _, inv_mask = cv2.threshold(gray, 235, 255, cv2.THRESH_BINARY_INV)
+            alpha = inv_mask
+        elif corner_mean < 30:
+            # Uniform black background: mask out pure black
+            gray = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY)
+            _, alpha = cv2.threshold(gray, 25, 255, cv2.THRESH_BINARY)
+        else:
+            # Complex photo: create smooth rounded-corner die-cut badge
+            h_r, w_r = raw.shape[:2]
+            alpha = np.zeros((h_r, w_r), dtype=np.uint8)
+            pad = int(min(h_r, w_r) * 0.04)
+            rad = int(min(h_r, w_r) * 0.12)
+            cv2.rectangle(alpha, (pad + rad, pad), (w_r - pad - rad, h_r - pad), 255, -1)
+            cv2.rectangle(alpha, (pad, pad + rad), (w_r - pad, h_r - pad - rad), 255, -1)
+            cv2.circle(alpha, (pad + rad, pad + rad), rad, 255, -1)
+            cv2.circle(alpha, (w_r - pad - rad, pad + rad), rad, 255, -1)
+            cv2.circle(alpha, (pad + rad, h_r - pad - rad), rad, 255, -1)
+            cv2.circle(alpha, (w_r - pad - rad, h_r - pad - rad), rad, 255, -1)
         raw = cv2.merge([b, g, r, alpha])
 
-    # Resize keeping aspect ratio into target_size bounding box
+    # Resize keeping aspect ratio into target_size bounding box with padding for shadow
     h, w = raw.shape[:2]
-    scale = (target_size - border_px * 4) / max(h, w)
+    max_dim = target_size - border_px * 6 - 20
+    scale = max_dim / max(h, w)
     new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
     resized = cv2.resize(raw, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
-    # Create padded square canvas
+    # Base canvas for compositing (with space for offset drop shadow)
     canvas = np.zeros((target_size, target_size, 4), dtype=np.uint8)
     y_off = (target_size - new_h) // 2
     x_off = (target_size - new_w) // 2
-    canvas[y_off:y_off + new_h, x_off:x_off + new_w] = resized
 
-    # Create mask for white die-cut border
-    mask = canvas[:, :, 3]
+    # Subject mask
+    subj_mask = np.zeros((target_size, target_size), dtype=np.uint8)
+    subj_mask[y_off:y_off + new_h, x_off:x_off + new_w] = resized[:, :, 3]
+
+    # Dilate for thick die-cut white border
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (border_px * 2 + 1, border_px * 2 + 1))
-    dilated_mask = cv2.dilate(mask, kernel, iterations=1)
-    border_region = cv2.subtract(dilated_mask, mask)
+    border_mask = cv2.dilate(subj_mask, kernel, iterations=1)
 
-    # Stamp border
+    # 1. Soft Drop Shadow (offset +6px x, +8px y, Gaussian blurred)
+    shadow_canvas = np.zeros((target_size, target_size), dtype=np.uint8)
+    dx, dy = 6, 8
+    s_x1, s_y1 = max(0, dx), max(0, dy)
+    s_x2, s_y2 = min(target_size, target_size + dx), min(target_size, target_size + dy)
+    m_x1, m_y1 = max(0, -dx), max(0, -dy)
+    m_x2, m_y2 = min(target_size, target_size - dx), min(target_size, target_size - dy)
+    shadow_canvas[s_y1:s_y2, s_x1:s_x2] = border_mask[m_y1:m_y2, m_x1:m_x2]
+    shadow_blurred = cv2.GaussianBlur(shadow_canvas, (17, 17), 5.0)
+    shadow_alpha = (shadow_blurred.astype(np.float32) * 0.42).astype(np.uint8)
+
+    # Paint shadow on canvas
+    canvas[:, :, 3] = shadow_alpha
+
+    # 2. Paint solid die-cut white border
     for c in range(3):
-        canvas[:, :, c] = np.where(border_region > 0, border_color_bgr[c], canvas[:, :, c])
-    canvas[:, :, 3] = dilated_mask
+        canvas[:, :, c] = np.where(border_mask > 0, border_color_bgr[c], canvas[:, :, c])
+    canvas[:, :, 3] = np.where(border_mask > 0, 255, canvas[:, :, 3])
+
+    # 3. Paint original subject over border
+    for c in range(3):
+        canvas[y_off:y_off + new_h, x_off:x_off + new_w, c] = np.where(
+            resized[:, :, 3] > 10,
+            resized[:, :, c],
+            canvas[y_off:y_off + new_h, x_off:x_off + new_w, c]
+        )
+    canvas[y_off:y_off + new_h, x_off:x_off + new_w, 3] = np.where(
+        resized[:, :, 3] > 10,
+        resized[:, :, 3],
+        canvas[y_off:y_off + new_h, x_off:x_off + new_w, 3]
+    )
 
     cv2.imwrite(str(out_sticker), canvas)
     return out_sticker

@@ -306,25 +306,39 @@ class JobManager:
         def _render_worker(cand: CandidateClip):
             if job_id in self.cancelled_jobs:
                 return None
+            use_stickers = bool(creator_style and creator_style.graphics.overlay_type == "die_cut_sticker") or (options.get("clipping_mode") == "podcast_qa")
             use_broll = bool(creator_style.graphics.enabled) if creator_style else bool(options.get("broll", False))
             use_sfx = bool(creator_style.audio.whoosh_on_cuts) if creator_style else bool(options.get("include_sfx", True))
             use_zoom = bool(creator_style.rhythm.snap_zoom_on_emphasis) if creator_style else bool(options.get("auto_zoom", True))
+
+            # Auto-assign podcast sound suite if in podcast mode and no track manually overridden
+            track = options.get("music_track")
+            if creator_style and creator_style.audio.bg_music_track:
+                track = creator_style.audio.bg_music_track
+            elif options.get("clipping_mode") == "podcast_qa":
+                from src.cliplocal.audio.music import get_podcast_sound_suite_for_archetype
+                arch = cand.score.hook_type if (cand.score and cand.score.hook_type) else "contrarian_truth"
+                track = get_podcast_sound_suite_for_archetype(arch)
+
+            cand_reframe = reframe_mode
+            if options.get("clipping_mode") == "podcast_qa" and reframe_mode == ReframeMode.AUTO:
+                cand_reframe = ReframeMode.PODCAST_REACTION_SPLIT
 
             render_candidate_clip(
                 video_path=video_path,
                 candidate=cand,
                 output_dir=output_dir,
                 metadata=metadata,
-                reframe_mode=reframe_mode,
+                reframe_mode=cand_reframe,
                 auto_zoom=use_zoom,
                 multicam=bool(options.get("multicam", True)),
                 top_banner=bool(options.get("top_banner", True)),
                 include_emojis=bool(options.get("include_emojis", True)),
                 include_sfx=use_sfx,
-                background_music=bool(options.get("background_music", False)),
+                background_music=bool(options.get("background_music", options.get("clipping_mode") == "podcast_qa")),
                 mute_original=bool(options.get("mute_original", False)),
-                music_track=creator_style.audio.bg_music_track if (creator_style and creator_style.audio.bg_music_track) else options.get("music_track", "ambient_lofi"),
-                music_volume=float(options.get("music_volume", 0.85 if options.get("mute_original") else 0.22)),
+                music_track=track or "ambient_lofi",
+                music_volume=float(options.get("music_volume", 0.85 if options.get("mute_original") else 0.20)),
                 anti_copyright=bool(options.get("anti_copyright", False)),
                 broll=use_broll,
                 extract_thumbnails=True,
@@ -337,7 +351,10 @@ class JobManager:
                 hook_stinger_type=str(options.get("hook_stinger_type", "whoosh")),
                 hook_snap_zoom=bool(options.get("hook_snap_zoom", True)),
                 teaser_stitch=bool(options.get("teaser_stitch", False)),
-                hook_headline=options.get("hook_headline")
+                hook_headline=options.get("hook_headline"),
+                frequency_carving=bool(options.get("frequency_carving", True)),
+                reaction_split_duration=3.2,
+                use_stickers=use_stickers
             )
             return cand
 
