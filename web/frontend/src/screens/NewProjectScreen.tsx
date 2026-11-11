@@ -26,7 +26,8 @@ import {
   Play,
   Volume2,
   VolumeX,
-  Music
+  Music,
+  X
 } from 'lucide-react'
 
 export const NewProjectScreen: React.FC = () => {
@@ -50,6 +51,14 @@ export const NewProjectScreen: React.FC = () => {
 
   // Step 2: Settings
   const [podcastMode, setPodcastMode] = useState(false)
+  const [stylesList, setStylesList] = useState<any[]>([])
+  const [selectedStyleProfile, setSelectedStyleProfile] = useState<string>('raj_shamani')
+  const [isCloneModalOpen, setIsCloneModalOpen] = useState(false)
+  const [cloneName, setCloneName] = useState('')
+  const [cloneHandle, setCloneHandle] = useState('')
+  const [cloneUrls, setCloneUrls] = useState('')
+  const [isCloning, setIsCloning] = useState(false)
+
   const [clipCount, setClipCount] = useState(5)
   const [duration, setDuration] = useState(35)
   const [selectedStyle, setSelectedStyle] = useState<CaptionStyle>('hormozi')
@@ -66,7 +75,61 @@ export const NewProjectScreen: React.FC = () => {
   // Initial discover search on mount
   useEffect(() => {
     handleSearch('naval ravikant')
+    fetchStyles()
   }, [])
+
+  const fetchStyles = async () => {
+    try {
+      const res = await fetch('/api/styles')
+      if (res.ok) {
+        const data = await res.json()
+        setStylesList(data)
+      }
+    } catch (e) {
+      console.error('Failed to load styles:', e)
+    }
+  }
+
+  const handleCloneStyle = async () => {
+    if (!cloneName.trim() || !cloneUrls.trim()) {
+      addToast({ title: 'Validation Error', description: 'Name and at least 1 URL or video path is required.', type: 'warning' })
+      return
+    }
+    setIsCloning(true)
+    try {
+      const urls = cloneUrls.split('\n').map((u) => u.trim()).filter(Boolean)
+      const res = await fetch('/api/styles/clone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: cloneName,
+          creator_handle: cloneHandle || `@${cloneName}`,
+          sample_urls: urls
+        })
+      })
+      if (res.ok) {
+        const result = await res.json()
+        addToast({
+          title: 'Creator Style DNA Cloned!',
+          description: `Successfully analyzed and saved '${result.profile.name}'`,
+          type: 'success'
+        })
+        await fetchStyles()
+        setSelectedStyleProfile(result.profile.id)
+        setIsCloneModalOpen(false)
+        setCloneName('')
+        setCloneHandle('')
+        setCloneUrls('')
+      } else {
+        const err = await res.json()
+        addToast({ title: 'Clone Failed', description: err.detail || 'Could not analyze video', type: 'danger' })
+      }
+    } catch (e) {
+      addToast({ title: 'Clone Error', description: 'Failed to connect to style engine', type: 'danger' })
+    } finally {
+      setIsCloning(false)
+    }
+  }
 
   const handleSearch = async (query: string) => {
     if (!query.trim()) return
@@ -151,6 +214,7 @@ export const NewProjectScreen: React.FC = () => {
       max_duration: Math.min(60, duration + 10),
       backend: 'mlx',
       podcast_mode: podcastMode,
+      style_profile: selectedStyleProfile,
       use_llm: true,
       auto_zoom: true,
       multicam: multiCam,
@@ -554,6 +618,40 @@ export const NewProjectScreen: React.FC = () => {
                 onChange={setDuration}
               />
 
+              {/* Creator Style Profile Selector */}
+              <div className="p-3.5 bg-[#141417] border border-border rounded-control space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-accent" />
+                    <span>Creator Style DNA (Mimic Creator)</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="text-[11px] text-accent hover:underline font-semibold flex items-center gap-1"
+                    onClick={() => setIsCloneModalOpen(true)}
+                  >
+                    <span>+ Clone New Creator...</span>
+                  </button>
+                </div>
+
+                <select
+                  className="w-full bg-[#18181B] border border-border text-xs rounded-control px-3 py-2 text-text-primary outline-none focus:border-accent"
+                  value={selectedStyleProfile}
+                  onChange={(e) => setSelectedStyleProfile(e.target.value)}
+                >
+                  {stylesList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.creator_handle || s.id})
+                    </option>
+                  ))}
+                </select>
+
+                <p className="text-[11px] text-text-secondary leading-snug">
+                  {stylesList.find((s) => s.id === selectedStyleProfile)?.description ||
+                    'Applies signature typography, snap-zoom pacing, and sticker cutaways.'}
+                </p>
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-text-secondary mb-1.5">
                   Brand Kit Preset
@@ -801,6 +899,78 @@ export const NewProjectScreen: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* CLONE CREATOR STYLE MODAL */}
+      {isCloneModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#18181B] border border-border rounded-card max-w-lg w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border/80 pb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-accent" />
+                <h3 className="text-sm font-bold text-text-primary">Clone Any Creator's Style DNA</h3>
+              </div>
+              <button
+                onClick={() => setIsCloneModalOpen(false)}
+                className="text-text-muted hover:text-text-primary p-1 rounded transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Paste 1–3 YouTube Shorts or Reels links from any creator (e.g. Raj Shamani, Iman Gadzhi). The engine will reverse-engineer their caption colors, cut pacing, snap-zooms, and graphic sticker styles so you can reuse them on any podcast.
+              </p>
+
+              <Input
+                label="Creator or Style Name"
+                placeholder="e.g. Raj Shamani, Alex Hormozi, My Custom Style"
+                value={cloneName}
+                onChange={(e) => setCloneName(e.target.value)}
+              />
+
+              <Input
+                label="Creator Handle (Optional)"
+                placeholder="e.g. @rajshamani"
+                value={cloneHandle}
+                onChange={(e) => setCloneHandle(e.target.value)}
+              />
+
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                  Reference Short URLs or File Paths (1 to 3 links, one per line)
+                </label>
+                <textarea
+                  className="w-full bg-[#121214] border border-border text-xs rounded-control p-3 text-text-primary placeholder:text-text-muted outline-none focus:border-accent min-h-[90px]"
+                  placeholder="https://www.youtube.com/shorts/..."
+                  value={cloneUrls}
+                  onChange={(e) => setCloneUrls(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-border/80">
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => setIsCloneModalOpen(false)}
+                disabled={isCloning}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                isLoading={isCloning}
+                icon={<Sparkles className="w-4 h-4" />}
+                onClick={handleCloneStyle}
+              >
+                {isCloning ? 'Analyzing Style (6-10s)...' : 'Clone & Save Style DNA'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

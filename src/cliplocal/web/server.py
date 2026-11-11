@@ -49,6 +49,7 @@ class SubmitJobRequest(BaseModel):
     backend: str = "mlx"
     language: Optional[str] = None
     podcast_mode: bool = False
+    style_profile: Optional[str] = "raj_shamani"
     use_llm: bool = False
     auto_zoom: bool = True
     multicam: bool = True
@@ -458,6 +459,57 @@ async def render_question_on_demand(job_id: str, qa_id: int):
         "output_path": str(rendered_file),
         "candidate": new_candidate.model_dump()
     }
+
+# =========================================================
+# CREATOR STYLE DNA & PROFILES API
+# =========================================================
+
+class CloneStyleRequest(BaseModel):
+    name: str
+    creator_handle: Optional[str] = None
+    sample_urls: List[str]
+    description: Optional[str] = None
+
+@app.get("/api/styles")
+async def get_styles():
+    from src.cliplocal.styles.manager import list_style_profiles
+    profiles = list_style_profiles()
+    return [p.model_dump() for p in profiles]
+
+@app.get("/api/styles/{profile_id}")
+async def get_single_style(profile_id: str):
+    from src.cliplocal.styles.manager import get_style_profile
+    p = get_style_profile(profile_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Style profile not found")
+    return p.model_dump()
+
+@app.post("/api/styles/clone")
+async def clone_creator_style(req: CloneStyleRequest):
+    if not req.sample_urls:
+        raise HTTPException(status_code=400, detail="Must provide at least 1 reference video URL or path")
+
+    from src.cliplocal.styles.extractor import clone_creator_style_dna
+    try:
+        profile = await asyncio.to_thread(
+            clone_creator_style_dna,
+            sample_paths_or_urls=req.sample_urls,
+            profile_id=req.name,
+            profile_name=req.name,
+            creator_handle=req.creator_handle,
+            description=req.description
+        )
+        return {"status": "success", "profile": profile.model_dump()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clone creator style: {e}")
+
+@app.delete("/api/styles/{profile_id}")
+async def remove_custom_style(profile_id: str):
+    from src.cliplocal.styles.manager import delete_style_profile
+    deleted = delete_style_profile(profile_id)
+    if not deleted:
+        raise HTTPException(status_code=400, detail="Cannot delete built-in profile or profile not found")
+    return {"status": "success", "deleted": profile_id}
 
 class HarvestRequest(BaseModel):
     channel_url: str

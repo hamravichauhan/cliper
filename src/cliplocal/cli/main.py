@@ -30,6 +30,7 @@ def run_pipeline(
     backend: Optional[str] = None,
     use_llm: bool = False,
     podcast_mode: bool = False,
+    style_profile: Optional[str] = None,
     auto_zoom: bool = True,
     multicam: bool = True,
     include_emojis: bool = True,
@@ -43,6 +44,22 @@ def run_pipeline(
 ) -> List[Path]:
     """Execute full ingest -> transcribe -> segment -> score -> render pipeline."""
     timer = StageTimer()
+
+    # Creator Style Profile Lookup
+    if style_profile:
+        from src.cliplocal.styles.manager import get_style_profile
+        creator_style = get_style_profile(style_profile)
+        if creator_style:
+            console.print(f"[bold cyan]🎨 Applying Creator Style Profile:[/] {creator_style.name} ({creator_style.creator_handle or creator_style.id})")
+            if creator_style.id == "raj_shamani":
+                style = CaptionStyleName.BOXED
+            elif creator_style.id == "alex_hormozi":
+                style = CaptionStyleName.HORMOZI
+            elif creator_style.id == "ali_abdaal":
+                style = CaptionStyleName.MINIMAL
+            broll = creator_style.graphics.enabled
+            include_sfx = creator_style.audio.whoosh_on_cuts
+            auto_zoom = creator_style.rhythm.snap_zoom_on_emphasis
 
     # Stage 1: Ingest
     timer.start_stage("1. Ingest & Probe")
@@ -193,6 +210,7 @@ def run(
     mode: str = typer.Option("auto", "--mode", "-m", help="Reframe mode: auto | center | blur_fill | face_follow"),
     backend: Optional[str] = typer.Option(None, "--backend", "-b", help="Transcription backend: mlx | faster_whisper | whisper_cpp"),
     podcast: bool = typer.Option(False, "--podcast/--no-podcast", help="Enable Podcast Q&A Mode: segment complete Question+Answer pairs and export master Q&A index"),
+    style_profile: Optional[str] = typer.Option("raj_shamani", "--style-profile", "-sp", help="Apply creator style profile (e.g. raj_shamani, alex_hormozi, ali_abdaal)"),
     no_llm: bool = typer.Option(True, "--no-llm", help="Disable Ollama LLM re-ranking (pure heuristics)"),
     anti_copyright: bool = typer.Option(False, "--anti-copyright/--no-anti-copyright", help="Apply transformative audio tempo (1.025x), vocal EQ, and visual grading"),
     multicam: bool = typer.Option(True, "--multicam/--no-multicam", help="Simulate 2-camera setup (wide vs tight close-up cuts on sentence transitions)"),
@@ -217,6 +235,7 @@ def run(
         backend=backend,
         use_llm=not no_llm,
         podcast_mode=podcast,
+        style_profile=style_profile,
         auto_zoom=auto_zoom,
         multicam=multicam,
         include_emojis=emojis,
@@ -227,6 +246,23 @@ def run(
         top_banner=top_banner,
         watermark=watermark
     )
+
+@app.command()
+def clone_style(
+    sources: List[str] = typer.Argument(..., help="1 to 3 reference vertical short video files or YouTube URLs"),
+    name: str = typer.Option(..., "--name", "-n", help="Name for this style profile (e.g. raj_shamani)"),
+    handle: Optional[str] = typer.Option(None, "--handle", "-h", help="Creator social handle (e.g. @rajshamani)"),
+    description: Optional[str] = typer.Option(None, "--description", "-d", help="Description")
+):
+    """Clone the editing style DNA from 1-3 reference videos to reuse across any project."""
+    from src.cliplocal.styles.extractor import clone_creator_style_dna
+    console.print(f"[bold cyan]🧬 Reverse-engineering editing style DNA from {len(sources)} sample(s)...[/]")
+    profile = clone_creator_style_dna(sources, profile_id=name, profile_name=name, creator_handle=handle, description=description)
+    console.print(f"[bold green]✔ Style DNA cloned & saved:[/] {profile.name} (ID: {profile.id})")
+    console.print(f"  • Highlight Color: {profile.typography.highlight_color}")
+    console.print(f"  • Cut Rhythm (ASD): {profile.rhythm.average_shot_duration_sec}s")
+    console.print(f"  • Graphic Overlays: {profile.graphics.overlay_type}")
+    console.print(f"[yellow]You can now use this style on any video with: --style-profile {profile.id}[/]")
 
 @app.command()
 def harvest(

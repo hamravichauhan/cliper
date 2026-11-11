@@ -282,6 +282,19 @@ class JobManager:
         caption_style = CaptionStyleName(style_str) if style_str in [e.value for e in CaptionStyleName] else CaptionStyleName.HORMOZI
         reframe_mode = ReframeMode(mode_str) if mode_str in [e.value for e in ReframeMode] else ReframeMode.AUTO
 
+        # Check for Creator Style Profile
+        style_profile_id = options.get("style_profile")
+        from src.cliplocal.styles.manager import get_style_profile
+        creator_style = get_style_profile(style_profile_id) if style_profile_id else None
+        if creator_style:
+            log(f"🎨 Applying Creator Style DNA: '{creator_style.name}' ({creator_style.creator_handle or creator_style.id})")
+            if creator_style.id == "raj_shamani":
+                caption_style = CaptionStyleName.BOXED
+            elif creator_style.id == "alex_hormozi":
+                caption_style = CaptionStyleName.HORMOZI
+            elif creator_style.id == "ali_abdaal":
+                caption_style = CaptionStyleName.MINIMAL
+
         for cand in top_candidates:
             cand.caption_style = caption_style
 
@@ -293,23 +306,27 @@ class JobManager:
         def _render_worker(cand: CandidateClip):
             if job_id in self.cancelled_jobs:
                 return None
+            use_broll = bool(creator_style.graphics.enabled) if creator_style else bool(options.get("broll", False))
+            use_sfx = bool(creator_style.audio.whoosh_on_cuts) if creator_style else bool(options.get("include_sfx", True))
+            use_zoom = bool(creator_style.rhythm.snap_zoom_on_emphasis) if creator_style else bool(options.get("auto_zoom", True))
+
             render_candidate_clip(
                 video_path=video_path,
                 candidate=cand,
                 output_dir=output_dir,
                 metadata=metadata,
                 reframe_mode=reframe_mode,
-                auto_zoom=bool(options.get("auto_zoom", True)),
+                auto_zoom=use_zoom,
                 multicam=bool(options.get("multicam", True)),
                 top_banner=bool(options.get("top_banner", True)),
                 include_emojis=bool(options.get("include_emojis", True)),
-                include_sfx=bool(options.get("include_sfx", True)),
+                include_sfx=use_sfx,
                 background_music=bool(options.get("background_music", False)),
                 mute_original=bool(options.get("mute_original", False)),
-                music_track=options.get("music_track", "ambient_lofi"),
+                music_track=creator_style.audio.bg_music_track if (creator_style and creator_style.audio.bg_music_track) else options.get("music_track", "ambient_lofi"),
                 music_volume=float(options.get("music_volume", 0.85 if options.get("mute_original") else 0.22)),
                 anti_copyright=bool(options.get("anti_copyright", False)),
-                broll=bool(options.get("broll", False)),
+                broll=use_broll,
                 extract_thumbnails=True,
                 watermark=options.get("watermark"),
                 retention_bar=bool(options.get("retention_bar", False)),
