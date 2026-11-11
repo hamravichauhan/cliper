@@ -306,22 +306,31 @@ class JobManager:
         def _render_worker(cand: CandidateClip):
             if job_id in self.cancelled_jobs:
                 return None
-            use_stickers = bool(creator_style and creator_style.graphics.overlay_type == "die_cut_sticker") or (options.get("clipping_mode") == "podcast_qa")
-            use_broll = bool(creator_style.graphics.enabled) if creator_style else bool(options.get("broll", False))
-            use_sfx = bool(creator_style.audio.whoosh_on_cuts) if creator_style else bool(options.get("include_sfx", True))
-            use_zoom = bool(creator_style.rhythm.snap_zoom_on_emphasis) if creator_style else bool(options.get("auto_zoom", True))
+            # Explicit user options override profile defaults if specified
+            use_stickers = bool(options.get("use_stickers")) if "use_stickers" in options else (
+                bool(creator_style and creator_style.graphics.overlay_type == "die_cut_sticker") or (options.get("clipping_mode") == "podcast_qa")
+            )
+            use_broll = bool(options.get("broll")) if "broll" in options else (
+                bool(creator_style.graphics.enabled) if creator_style else False
+            )
+            use_sfx = bool(options.get("include_sfx")) if "include_sfx" in options else (
+                bool(creator_style.audio.whoosh_on_cuts) if creator_style else True
+            )
+            use_zoom = bool(options.get("auto_zoom")) if "auto_zoom" in options else (
+                bool(creator_style.rhythm.snap_zoom_on_emphasis) if creator_style else True
+            )
 
             # Auto-assign podcast sound suite if in podcast mode and no track manually overridden
             track = options.get("music_track")
-            if creator_style and creator_style.audio.bg_music_track:
+            if not track and creator_style and creator_style.audio.bg_music_track:
                 track = creator_style.audio.bg_music_track
-            elif options.get("clipping_mode") == "podcast_qa":
+            elif not track and options.get("clipping_mode") == "podcast_qa":
                 from src.cliplocal.audio.music import get_podcast_sound_suite_for_archetype
                 arch = cand.score.hook_type if (cand.score and cand.score.hook_type) else "contrarian_truth"
                 track = get_podcast_sound_suite_for_archetype(arch)
 
             cand_reframe = reframe_mode
-            if options.get("clipping_mode") == "podcast_qa" and reframe_mode == ReframeMode.AUTO:
+            if options.get("podcast_reaction_split") or (options.get("clipping_mode") == "podcast_qa" and reframe_mode == ReframeMode.AUTO):
                 cand_reframe = ReframeMode.PODCAST_REACTION_SPLIT
 
             render_candidate_clip(
@@ -332,10 +341,10 @@ class JobManager:
                 reframe_mode=cand_reframe,
                 auto_zoom=use_zoom,
                 multicam=bool(options.get("multicam", True)),
-                top_banner=bool(options.get("top_banner", True)),
+                top_banner=bool(options.get("top_banner", False)),
                 include_emojis=bool(options.get("include_emojis", True)),
                 include_sfx=use_sfx,
-                background_music=bool(options.get("background_music", options.get("clipping_mode") == "podcast_qa")),
+                background_music=bool(options.get("background_music", False)),
                 mute_original=bool(options.get("mute_original", False)),
                 music_track=track or "ambient_lofi",
                 music_volume=float(options.get("music_volume", 0.85 if options.get("mute_original") else 0.20)),

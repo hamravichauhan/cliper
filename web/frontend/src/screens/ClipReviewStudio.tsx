@@ -95,6 +95,20 @@ export const ClipReviewStudio: React.FC = () => {
   const [studioUseStickers, setStudioUseStickers] = useState<boolean>(true)
   const [isReRenderingWithStyle, setIsReRenderingWithStyle] = useState<boolean>(false)
 
+  // Granular Feature States in Studio
+  const [studioAutoZoom, setStudioAutoZoom] = useState<boolean>(true)
+  const [studioMultiCam, setStudioMultiCam] = useState<boolean>(true)
+  const [studioHookSnapZoom, setStudioHookSnapZoom] = useState<boolean>(true)
+  const [studioHookStinger, setStudioHookStinger] = useState<boolean>(true)
+  const [studioStripFillers, setStudioStripFillers] = useState<boolean>(true)
+  const [studioTopBanner, setStudioTopBanner] = useState<boolean>(true)
+  const [studioIncludeEmojis, setStudioIncludeEmojis] = useState<boolean>(true)
+  const [studioIncludeSfx, setStudioIncludeSfx] = useState<boolean>(true)
+  const [studioBrollCutaways, setStudioBrollCutaways] = useState<boolean>(false)
+  const [studioRetentionBar, setStudioRetentionBar] = useState<boolean>(false)
+  const [studioSemanticHighlighting, setStudioSemanticHighlighting] = useState<boolean>(true)
+  const [studioAntiCopyright, setStudioAntiCopyright] = useState<boolean>(false)
+
   const fetchAvailableStyles = async () => {
     try {
       const res = await fetch('/api/styles')
@@ -113,25 +127,36 @@ export const ClipReviewStudio: React.FC = () => {
 
   const handleApplyStudioStyle = async (overrideProfile?: string, overrideSound?: string) => {
     if (!clip) return
-    const prof = overrideProfile || studioStyleProfile
-    const sound = overrideSound || studioSoundSuite
+    const prof = overrideProfile !== undefined ? overrideProfile : studioStyleProfile
+    const sound = overrideSound !== undefined ? overrideSound : studioSoundSuite
     setIsReRenderingWithStyle(true)
     try {
       const success = await reRenderCurrentClip(clip.id, {
-        style_profile: prof,
+        style_profile: prof === 'none' ? null : prof,
         music_track: sound,
         background_music: sound !== 'none',
         frequency_carving: studioFrequencyCarving,
         reframe_mode: studioReframeMode,
         podcast_reaction_split: studioReframeMode === 'podcast_reaction_split',
         teaser_stitch: studioTeaserStitch,
-        broll: studioUseStickers,
-        use_stickers: studioUseStickers
+        broll: studioBrollCutaways,
+        use_stickers: studioUseStickers,
+        auto_zoom: studioAutoZoom,
+        multicam: studioMultiCam,
+        hook_snap_zoom: studioHookSnapZoom,
+        hook_stinger: studioHookStinger,
+        strip_fillers: studioStripFillers,
+        top_banner: studioTopBanner,
+        include_emojis: studioIncludeEmojis,
+        include_sfx: studioIncludeSfx,
+        retention_bar: studioRetentionBar,
+        semantic_highlighting: studioSemanticHighlighting,
+        anti_copyright: studioAntiCopyright
       })
       if (success) {
         addToast({
-          title: 'Style DNA Applied',
-          description: `Clip re-rendered with ${prof.replace('_', ' ')} visual DNA and ${sound.replace('_', ' ')} sound suite!`,
+          title: 'Selected Features Applied',
+          description: `Clip re-rendered with your exact feature selections!`,
           type: 'success'
         })
       }
@@ -1121,12 +1146,34 @@ export const ClipReviewStudio: React.FC = () => {
                       )
                     })}
                   </div>
+
+                  {/* Dynamic Motion & Camera Zooms */}
+                  <div className="pt-2 border-t border-border/60 space-y-2">
+                    <Toggle
+                      label="✂️ Multi-Cam Active Speaker Cuts"
+                      description="Simulate camera cuts between wide and close-up angles."
+                      checked={studioMultiCam}
+                      onChange={setStudioMultiCam}
+                    />
+                    <Toggle
+                      label="🔍 Punch-in Auto-Zoom"
+                      description="Subtle 1.15x zoom punches on high-energy sentences."
+                      checked={studioAutoZoom}
+                      onChange={setStudioAutoZoom}
+                    />
+                    <Toggle
+                      label="⚡ 0.0s Hook Snap-Zoom"
+                      description="1.25x instant zoom for first 2.2s to retain opening viewers."
+                      checked={studioHookSnapZoom}
+                      onChange={setStudioHookSnapZoom}
+                    />
+                  </div>
                 </div>
 
-                {/* Section 4: Hook Optimization & Neural Stickers */}
+                {/* Section 4: Hook Optimization & Speech Polishing */}
                 <div className="space-y-2 pt-2 border-t border-border">
                   <label className="block text-xs font-semibold text-text-primary">
-                    4. Hook Optimization & Overlays
+                    4. Hook Optimization & Speech Polish
                   </label>
                   <div className="p-2.5 bg-[#18181B] border border-border/80 rounded-control space-y-3">
                     <Toggle
@@ -1136,10 +1183,73 @@ export const ClipReviewStudio: React.FC = () => {
                       onChange={setStudioTeaserStitch}
                     />
                     <Toggle
+                      label="🧹 Strip Dead Air & Filler Words"
+                      description="Auto-cut leading 'uhm, so, you know' and hesitations before speech."
+                      checked={studioStripFillers}
+                      onChange={setStudioStripFillers}
+                    />
+                    <Toggle
+                      label="🏷️ Top Context Headline Banner"
+                      description="Display clean spoken thesis headline at the top of the frame."
+                      checked={studioTopBanner}
+                      onChange={setStudioTopBanner}
+                    />
+                    <Toggle
+                      label="💨 0.0s Orienting Acoustic Stinger"
+                      description="Inject whoosh transition sound at the very opening millisecond."
+                      checked={studioHookStinger}
+                      onChange={setStudioHookStinger}
+                    />
+                    <Toggle
+                      label="🔊 Dynamic Sound Effects (SFX)"
+                      description="Sync whoosh scene cuts, pop transitions, and cash dings."
+                      checked={studioIncludeSfx}
+                      onChange={setStudioIncludeSfx}
+                    />
+                  </div>
+                </div>
+
+                {/* Section 5: Overlays, Stickers & Anti-Copyright */}
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <label className="block text-xs font-semibold text-text-primary">
+                    5. Overlays, Stickers & Protection
+                  </label>
+                  <div className="p-2.5 bg-[#18181B] border border-border/80 rounded-control space-y-3">
+                    <Toggle
                       label="🏷️ Floating Die-Cut Stickers"
                       description="Pop entity cutout stickers with 4px white outline and soft drop shadow."
                       checked={studioUseStickers}
                       onChange={setStudioUseStickers}
+                    />
+                    <Toggle
+                      label="🎬 Fullscreen B-Roll Cutaways"
+                      description="Layer topical contextual b-roll footage over keywords."
+                      checked={studioBrollCutaways}
+                      onChange={setStudioBrollCutaways}
+                    />
+                    <Toggle
+                      label="✨ Semantic Word Pop Highlighting"
+                      description="Vibrantly color the active spoken word with animated pop scale."
+                      checked={studioSemanticHighlighting}
+                      onChange={setStudioSemanticHighlighting}
+                    />
+                    <Toggle
+                      label="😀 Contextual Smart Emojis"
+                      description="Insert animated emojis matching spoken concepts."
+                      checked={studioIncludeEmojis}
+                      onChange={setStudioIncludeEmojis}
+                    />
+                    <Toggle
+                      label="📊 3px Retention Progress Bar"
+                      description="Slim neon progress bar across bottom to prevent mobile skipping."
+                      checked={studioRetentionBar}
+                      onChange={setStudioRetentionBar}
+                    />
+                    <Toggle
+                      label="🛡️ Anti-Copyright Transformative Shield"
+                      description="Apply 2.5% audio tempo shift, vocal presence EQ, and subtle video filters."
+                      checked={studioAntiCopyright}
+                      onChange={setStudioAntiCopyright}
                     />
                   </div>
                 </div>
@@ -1154,7 +1264,7 @@ export const ClipReviewStudio: React.FC = () => {
                     loading={isReRenderingWithStyle}
                     onClick={() => handleApplyStudioStyle()}
                   >
-                    ⚡ Apply Style DNA & Re-render Clip
+                    ⚡ Apply Selected Features & Re-render Clip
                   </Button>
                 </div>
               </div>

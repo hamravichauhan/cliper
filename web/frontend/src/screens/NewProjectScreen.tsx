@@ -49,7 +49,7 @@ export const NewProjectScreen: React.FC = () => {
   const [isHarvesting, setIsHarvesting] = useState(false)
   const [harvestedVideos, setHarvestedVideos] = useState<any[]>([])
 
-  // Step 2: Settings
+  // Step 2: Settings & Granular Feature Toggles
   const [podcastMode, setPodcastMode] = useState(false)
   const [stylesList, setStylesList] = useState<any[]>([])
   const [selectedStyleProfile, setSelectedStyleProfile] = useState<string>('raj_shamani')
@@ -63,14 +63,37 @@ export const NewProjectScreen: React.FC = () => {
   const [duration, setDuration] = useState(35)
   const [selectedStyle, setSelectedStyle] = useState<CaptionStyle>('hormozi')
   const [selectedBrandKit, setSelectedBrandKit] = useState(brandKits[0]?.id || '')
-  const [multiCam, setMultiCam] = useState(true)
-  const [faceTracking, setFaceTracking] = useState(true)
-  const [sfx, setSfx] = useState(true)
-  const [muteOriginal, setMuteOriginal] = useState(false)
-  const [addSong, setAddSong] = useState(false)
-  const [selectedSong, setSelectedSong] = useState('ambient_lofi')
-  const [songVolume, setSongVolume] = useState(70)
+
+  // Camera & Framing Toggles
+  const [reactionSplit, setReactionSplit] = useState(true)               // Dual-Speaker Reaction Split
+  const [faceTracking, setFaceTracking] = useState(true)                 // 9:16 Face Follow
+  const [multiCam, setMultiCam] = useState(true)                         // Multi-Cam Jump Cuts
+  const [autoZoom, setAutoZoom] = useState(true)                         // Punch-in Auto Zoom
+  const [hookSnapZoom, setHookSnapZoom] = useState(true)                 // 0.0s Hook Snap-Zoom
+  const [patternZoom, setPatternZoom] = useState(true)                   // Pattern Interrupt Zooms
+
+  // Audio & Sound Suite Toggles
+  const [addSong, setAddSong] = useState(false)                          // Background Music
+  const [selectedSong, setSelectedSong] = useState('tension_drone')      // Music Track Preset
+  const [songVolume, setSongVolume] = useState(70)                       // Music Volume
   const [customSongFile, setCustomSongFile] = useState<string | null>(null)
+  const [frequencyCarving, setFrequencyCarving] = useState(true)         // 2.4kHz Vocal Clarity Notch
+  const [sfx, setSfx] = useState(true)                                   // Dynamic Sound Effects (SFX)
+  const [muteOriginal, setMuteOriginal] = useState(false)                // Mute Source Video Audio
+
+  // Hook & Speech Polishing Toggles
+  const [stripFillers, setStripFillers] = useState(true)                 // Strip Dead Air & Fillers
+  const [coldOpenTeaser, setColdOpenTeaser] = useState(false)             // Cold Open Climax Teaser
+  const [topBanner, setTopBanner] = useState(true)                       // Top Context Headline Banner
+  const [hookStinger, setHookStinger] = useState(true)                   // 0.0s Acoustic Whoosh Stinger
+
+  // Visual Overlays & Anti-Copyright Toggles
+  const [useStickers, setUseStickers] = useState(true)                   // Floating Die-Cut Stickers
+  const [brollCutaways, setBrollCutaways] = useState(false)              // Fullscreen B-Roll Cutaways
+  const [semanticHighlighting, setSemanticHighlighting] = useState(true) // Dynamic Word Pop Highlighting
+  const [includeEmojis, setIncludeEmojis] = useState(true)               // Contextual Smart Emojis
+  const [retentionBar, setRetentionBar] = useState(false)                // 3px Retention Progress Bar
+  const [antiCopyright, setAntiCopyright] = useState(false)              // Transformative Anti-Copyright Shield
 
   // Initial discover search on mount
   useEffect(() => {
@@ -209,23 +232,34 @@ export const NewProjectScreen: React.FC = () => {
       source,
       clips: clipCount,
       style: selectedStyle,
-      mode: faceTracking ? 'auto' : 'center',
+      mode: reactionSplit ? 'podcast_reaction_split' : (faceTracking ? 'auto' : 'center'),
       min_duration: Math.max(15, duration - 10),
       max_duration: Math.min(60, duration + 10),
       backend: 'mlx',
       podcast_mode: podcastMode,
-      style_profile: selectedStyleProfile,
+      style_profile: selectedStyleProfile === 'none' ? null : selectedStyleProfile,
       use_llm: true,
-      auto_zoom: true,
+      auto_zoom: autoZoom,
       multicam: multiCam,
-      top_banner: true,
-      include_emojis: true,
+      top_banner: topBanner,
+      include_emojis: includeEmojis,
       include_sfx: sfx,
       background_music: addSong,
       mute_original: muteOriginal,
       music_track: customSongFile || selectedSong,
       music_volume: muteOriginal ? (songVolume / 100) : Number(((songVolume / 100) * 0.35).toFixed(2)),
-      anti_copyright: true
+      anti_copyright: antiCopyright,
+      frequency_carving: frequencyCarving,
+      podcast_reaction_split: reactionSplit,
+      hook_snap_zoom: hookSnapZoom,
+      hook_stinger: hookStinger,
+      strip_fillers: stripFillers,
+      teaser_stitch: coldOpenTeaser,
+      use_stickers: useStickers,
+      broll: brollCutaways,
+      retention_bar: retentionBar,
+      semantic_highlighting: semanticHighlighting,
+      pattern_zoom: patternZoom
     })
 
     setScreen('processing')
@@ -567,150 +601,254 @@ export const NewProjectScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* STEP 2: PIPELINE SETTINGS */}
-        <div className="bg-bg-surface border border-border rounded-card p-5 space-y-5">
-          <div className="flex items-center justify-between">
+        {/* STEP 2: PIPELINE SETTINGS & FEATURE CONTROL CENTER */}
+        <div className="bg-bg-surface border border-border rounded-card p-5 space-y-6">
+          <div className="flex items-center justify-between border-b border-border/80 pb-3">
             <span className="text-xs font-semibold text-text-primary flex items-center gap-2">
               <span className="w-5 h-5 rounded-full bg-accent/20 text-accent font-mono text-xs flex items-center justify-center font-bold">
                 2
               </span>
-              <span>Pipeline & Styling Settings</span>
+              <span>Feature Control Center (Granular AI Pipeline Options)</span>
+            </span>
+            <span className="text-[11px] text-text-muted">
+              Click any toggle to select or deselect features individually.
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              {/* Podcast Mode Toggle Box */}
-              <div className="p-3.5 bg-[#141417] border border-border rounded-control space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-text-primary flex items-center gap-2 cursor-pointer" onClick={() => setPodcastMode(!podcastMode)}>
-                    <Radio className="w-4 h-4 text-purple-400" />
-                    <span>🎙️ Podcast Q&A Mode</span>
-                  </label>
-                  <Toggle
-                    label=""
-                    checked={podcastMode}
-                    onChange={setPodcastMode}
-                  />
-                </div>
-                <p className="text-[11px] text-text-secondary leading-relaxed">
-                  {podcastMode
-                    ? "Active: Extracts complete Question+Answer pairs, strips host fluff, matches guest answers, and exports a master Q&A question index for 1-click on-demand rendering."
-                    : "Standard Mode: High-energy sentence cuts & topic highlights. Toggle ON for interview & podcast videos."}
-                </p>
-              </div>
+          {/* Primary Harvest Parameters */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-[#141417] border border-border rounded-control">
+            <Slider
+              label="Clips to Harvest"
+              min={1}
+              max={15}
+              value={clipCount}
+              unit=" clips"
+              onChange={setClipCount}
+            />
 
-              <Slider
-                label="Number of Viral Clips to Harvest"
-                min={1}
-                max={15}
-                value={clipCount}
-                unit=" clips"
-                onChange={setClipCount}
-              />
+            <Slider
+              label="Target Clip Duration"
+              min={20}
+              max={60}
+              value={duration}
+              unit="s"
+              onChange={setDuration}
+            />
 
-              <Slider
-                label="Target Clip Duration"
-                min={20}
-                max={60}
-                value={duration}
-                unit="s"
-                onChange={setDuration}
-              />
-
-              {/* Creator Style Profile Selector */}
-              <div className="p-3.5 bg-[#141417] border border-border rounded-control space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-accent" />
-                    <span>Creator Style DNA (Mimic Creator)</span>
-                  </label>
-                  <button
-                    type="button"
-                    className="text-[11px] text-accent hover:underline font-semibold flex items-center gap-1"
-                    onClick={() => setIsCloneModalOpen(true)}
-                  >
-                    <span>+ Clone New Creator...</span>
-                  </button>
-                </div>
-
-                <select
-                  className="w-full bg-[#18181B] border border-border text-xs rounded-control px-3 py-2 text-text-primary outline-none focus:border-accent"
-                  value={selectedStyleProfile}
-                  onChange={(e) => setSelectedStyleProfile(e.target.value)}
-                >
-                  {stylesList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.creator_handle || s.id})
-                    </option>
-                  ))}
-                </select>
-
-                <p className="text-[11px] text-text-secondary leading-snug">
-                  {stylesList.find((s) => s.id === selectedStyleProfile)?.description ||
-                    'Applies signature typography, snap-zoom pacing, and sticker cutaways.'}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                  Brand Kit Preset
+            {/* Creator Style DNA Preset */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-text-primary flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-accent" />
+                  <span>Creator Style DNA</span>
                 </label>
-                <select
-                  className="w-full bg-[#18181B] border border-border text-xs rounded-control px-3 py-2 text-text-primary outline-none focus:border-accent"
-                  value={selectedBrandKit}
-                  onChange={(e) => {
-                    const kitId = e.target.value
-                    setSelectedBrandKit(kitId)
-                    const found = brandKits.find((b) => b.id === kitId)
-                    if (found && found.defaultStyle) {
-                      setSelectedStyle(found.defaultStyle)
-                    }
-                  }}
+                <button
+                  type="button"
+                  className="text-[10px] text-accent hover:underline font-semibold"
+                  onClick={() => setIsCloneModalOpen(true)}
                 >
-                  {brandKits.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} ({b.handle})
-                    </option>
-                  ))}
-                </select>
+                  + Clone Style
+                </button>
               </div>
+              <select
+                className="w-full bg-[#18181B] border border-border text-xs rounded-control px-2.5 py-1.5 text-text-primary outline-none focus:border-accent"
+                value={selectedStyleProfile}
+                onChange={(e) => setSelectedStyleProfile(e.target.value)}
+              >
+                <option value="none">✨ Manual / Custom (No Profile Override)</option>
+                {stylesList.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.creator_handle || s.id})
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-text-muted truncate">
+                {selectedStyleProfile === 'none'
+                  ? 'All toggles below operate purely on your manual selections.'
+                  : stylesList.find((s) => s.id === selectedStyleProfile)?.description || 'Applies creator typography, cadence, and overlays.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Granular Feature Toggles Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* GROUP A: Podcast & Hook Optimization */}
+            <div className="p-4 bg-[#141417] border border-border rounded-control space-y-3.5">
+              <div className="flex items-center gap-2 pb-1 border-b border-border/60">
+                <Radio className="w-4 h-4 text-purple-400" />
+                <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">
+                  Podcast & Hook Optimization
+                </h4>
+              </div>
+
+              <Toggle
+                label="🎙️ Dual-Speaker Reaction Split"
+                description="Host on top, Guest on bottom during initial 3.2s question, then snaps to guest face-follow."
+                checked={reactionSplit}
+                onChange={setReactionSplit}
+              />
+
+              <Toggle
+                label="⚡ Cold Open Climax Teaser"
+                description="Stitches 1.5s climax punchline before the question separated by a whoosh transition."
+                checked={coldOpenTeaser}
+                onChange={setColdOpenTeaser}
+              />
+
+              <Toggle
+                label="🧹 Strip Dead Air & Filler Words"
+                description="Auto-cuts opening 'uhm, so, you know' and awkward pauses before speech."
+                checked={stripFillers}
+                onChange={setStripFillers}
+              />
+
+              <Toggle
+                label="🏷️ Top Context Headline Banner"
+                description="Displays clean spoken thesis headline at the top without ugly bounding box."
+                checked={topBanner}
+                onChange={setTopBanner}
+              />
+
+              <Toggle
+                label="💨 0.0s Orienting Acoustic Stinger"
+                description="Injects a crisp whoosh transition sound at the very opening millisecond."
+                checked={hookStinger}
+                onChange={setHookStinger}
+              />
             </div>
 
-            <div className="space-y-3.5">
-              <Toggle
-                label="Multi-Cam Active Speaker Auto-Cut"
-                description="Switches camera framing to the active speaker."
-                checked={multiCam}
-                onChange={setMultiCam}
-              />
+            {/* GROUP B: Camera Framing & Motion Engine */}
+            <div className="p-4 bg-[#141417] border border-border rounded-control space-y-3.5">
+              <div className="flex items-center gap-2 pb-1 border-b border-border/60">
+                <FileVideo className="w-4 h-4 text-accent" />
+                <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">
+                  Camera Framing & Motion
+                </h4>
+              </div>
 
               <Toggle
-                label="9:16 Face Centering & Tracking"
-                description="Crops horizontal footage to vertical around the face."
+                label="👤 9:16 Face Follow Centering"
+                description="Uses local MediaPipe / OpenCV face detector to frame the speaker."
                 checked={faceTracking}
                 onChange={setFaceTracking}
               />
 
               <Toggle
-                label="Dynamic Sound Effects & Pop Animations"
-                description="Syncs whoosh SFX and animated emphasis on hooks."
+                label="✂️ Multi-Cam Active Speaker Auto-Cut"
+                description="Simulates professional multi-camera cuts between wide and close-up angles."
+                checked={multiCam}
+                onChange={setMultiCam}
+              />
+
+              <Toggle
+                label="🔍 Punch-in Auto-Zoom on Emphasis"
+                description="Performs subtle 1.15x zoom punches on high-energy sentences."
+                checked={autoZoom}
+                onChange={setAutoZoom}
+              />
+
+              <Toggle
+                label="⚡ 0.0s Hook Snap-Zoom"
+                description="Instantly zooms in to 1.25x for the opening 2.2 seconds to maximize retention."
+                checked={hookSnapZoom}
+                onChange={setHookSnapZoom}
+              />
+
+              <Toggle
+                label="📐 Pattern Interrupt Cadence"
+                description="Varies framing every 2.5-3.0s to prevent viewer scrolling drop-off."
+                checked={patternZoom}
+                onChange={setPatternZoom}
+              />
+            </div>
+
+            {/* GROUP C: Audio, Sound Suites & Vocal Carving */}
+            <div className="p-4 bg-[#141417] border border-border rounded-control space-y-3.5">
+              <div className="flex items-center gap-2 pb-1 border-b border-border/60">
+                <Music className="w-4 h-4 text-emerald-400" />
+                <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">
+                  Audio & Sound Engine
+                </h4>
+              </div>
+
+              <Toggle
+                label="🎵 Background Music / Sound Suite"
+                description="Layer Content-ID-safe procedural sound loop with sidechain auto-ducking."
+                checked={addSong}
+                onChange={setAddSong}
+              />
+
+              <Toggle
+                label="🎙️ 2.4kHz Vocal Clarity Notch (Carving)"
+                description="Applies an EQ notch to background music at 2.4kHz so dialogue cuts through crystal-clear."
+                checked={frequencyCarving}
+                onChange={setFrequencyCarving}
+              />
+
+              <Toggle
+                label="🔊 Dynamic Sound Effects (SFX)"
+                description="Adds whoosh cuts, pop transitions, and cash dings synced to speech."
                 checked={sfx}
                 onChange={setSfx}
               />
 
               <Toggle
-                label="Mute Original Video Audio"
-                description="Silence speaker dialogue and background noise from the video completely."
+                label="🔇 Mute Source Video Audio"
+                description="Silence all dialogue and background noise from the original video completely."
                 checked={muteOriginal}
                 onChange={setMuteOriginal}
               />
+            </div>
+
+            {/* GROUP D: Visual Overlays, Stickers & Anti-Copyright */}
+            <div className="p-4 bg-[#141417] border border-border rounded-control space-y-3.5">
+              <div className="flex items-center gap-2 pb-1 border-b border-border/60">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">
+                  Overlays, Stickers & Security
+                </h4>
+              </div>
 
               <Toggle
-                label="Add Viral Song / Background Music"
-                description="Layer a trending soundtrack or beat over the vertical clip."
-                checked={addSong}
-                onChange={setAddSong}
+                label="🏷️ Floating Die-Cut Cutout Stickers"
+                description="Pops non-copyright entity stickers with 4px solid white stroke and soft drop shadow."
+                checked={useStickers}
+                onChange={setUseStickers}
+              />
+
+              <Toggle
+                label="🎬 Fullscreen B-Roll Cutaways"
+                description="Contextual cutaway footage triggered by spoken topic entities."
+                checked={brollCutaways}
+                onChange={setBrollCutaways}
+              />
+
+              <Toggle
+                label="✨ Semantic Word Pop Highlighting"
+                description="Vibrantly colors the active spoken word with animated pop scale."
+                checked={semanticHighlighting}
+                onChange={setSemanticHighlighting}
+              />
+
+              <Toggle
+                label="😀 Contextual Smart Emojis"
+                description="Places relevant animated emojis above high-energy words."
+                checked={includeEmojis}
+                onChange={setIncludeEmojis}
+              />
+
+              <Toggle
+                label="📊 3px Retention Progress Bar"
+                description="Slim neon progress bar across the bottom to combat mobile skip rates."
+                checked={retentionBar}
+                onChange={setRetentionBar}
+              />
+
+              <Toggle
+                label="🛡️ Transformative Anti-Copyright Shield"
+                description="Applies subtle 2.5% tempo masking, vocal presence EQ, and transformation factors."
+                checked={antiCopyright}
+                onChange={setAntiCopyright}
               />
             </div>
           </div>

@@ -63,6 +63,17 @@ class SubmitJobRequest(BaseModel):
     anti_copyright: bool = False
     broll: bool = False
     watermark: Optional[str] = None
+    frequency_carving: bool = True
+    podcast_reaction_split: bool = False
+    hook_snap_zoom: bool = True
+    hook_stinger: bool = True
+    hook_stinger_type: str = "whoosh"
+    strip_fillers: bool = True
+    teaser_stitch: bool = False
+    use_stickers: bool = False
+    retention_bar: bool = False
+    semantic_highlighting: bool = True
+    pattern_zoom: bool = True
 
 @app.post("/api/jobs")
 async def create_job(req: SubmitJobRequest):
@@ -181,19 +192,19 @@ class ReRenderRequest(BaseModel):
     anti_copyright: bool = False
     broll: bool = False
     watermark: Optional[str] = None
+    frequency_carving: bool = True
+    podcast_reaction_split: bool = False
+    hook_snap_zoom: bool = True
+    hook_stinger: bool = True
+    hook_stinger_type: str = "whoosh"
+    strip_fillers: bool = True
+    teaser_stitch: bool = False
+    use_stickers: bool = False
     retention_bar: bool = False
     semantic_highlighting: bool = True
     pattern_zoom: bool = True
-    strip_fillers: bool = True
-    hook_stinger: bool = True
-    hook_stinger_type: str = "whoosh"
-    hook_snap_zoom: bool = True
-    teaser_stitch: bool = False
     hook_headline: Optional[str] = None
     style_profile: Optional[str] = None
-    frequency_carving: bool = True
-    podcast_reaction_split: bool = False
-    use_stickers: bool = False
 
 @app.post("/api/clips/re-render")
 def re_render_clip(req: ReRenderRequest):
