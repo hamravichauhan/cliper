@@ -179,6 +179,67 @@ export const NewProjectScreen: React.FC = () => {
         </p>
       </div>
 
+      {/* PRIMARY MODE SELECTOR: Standard vs Podcast Q&A Mode */}
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+          Select Clipping Mode
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          {/* Option A: Standard Mode */}
+          <div
+            onClick={() => setPodcastMode(false)}
+            className={`cursor-pointer rounded-card p-4 border transition-all flex items-start gap-3.5 ${
+              !podcastMode
+                ? 'bg-[#18181B] border-accent shadow-md shadow-accent/5'
+                : 'bg-bg-surface border-border hover:border-border/80 opacity-70'
+            }`}
+          >
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+              !podcastMode ? 'bg-accent/20 text-accent' : 'bg-surface-elevated text-text-muted'
+            }`}>
+              <Zap className="w-5 h-5" />
+            </div>
+            <div className="space-y-1 flex-1">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-text-primary">🎬 Standard Shorts Mode</h3>
+                {!podcastMode && <Badge variant="accent">Active</Badge>}
+              </div>
+              <p className="text-[11px] text-text-secondary leading-snug">
+                Detects highest-energy sentences, punchlines, and topic highlights with auto-zoom and dynamic pacing.
+              </p>
+            </div>
+          </div>
+
+          {/* Option B: Podcast Q&A Mode */}
+          <div
+            onClick={() => setPodcastMode(true)}
+            className={`cursor-pointer rounded-card p-4 border transition-all flex items-start gap-3.5 ${
+              podcastMode
+                ? 'bg-[#18181B] border-purple-400 shadow-md shadow-purple-500/10'
+                : 'bg-bg-surface border-border hover:border-border/80 opacity-70'
+            }`}
+          >
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+              podcastMode ? 'bg-purple-500/20 text-purple-400' : 'bg-surface-elevated text-text-muted'
+            }`}>
+              <Radio className="w-5 h-5" />
+            </div>
+            <div className="space-y-1 flex-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold text-text-primary">🎙️ Podcast Q&A Mode</h3>
+                  <Badge variant="accent">NEW</Badge>
+                </div>
+                {podcastMode && <Badge variant="accent">Active</Badge>}
+              </div>
+              <p className="text-[11px] text-text-secondary leading-snug">
+                Pairs questions with guest answers, strips host rambling, cuts on mic-drops, and builds a master Q&A index.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Progressive 3-Step Flow */}
       <div className="space-y-6">
         {/* STEP 1: SOURCE */}
