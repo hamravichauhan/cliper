@@ -29,6 +29,7 @@ def run_pipeline(
     reframe_mode: ReframeMode = ReframeMode.CENTER,
     backend: Optional[str] = None,
     use_llm: bool = False,
+    podcast_mode: bool = False,
     auto_zoom: bool = True,
     multicam: bool = True,
     include_emojis: bool = True,
@@ -71,23 +72,64 @@ def run_pipeline(
     console.print(f"[green]✔ Segmented into {len(sentences)} natural thought units[/]")
     timer.end_stage()
 
-    # Stage 4: Candidate Windows
-    timer.start_stage("4. Candidate Windows")
-    raw_candidates = build_candidate_windows(sentences)
-    timer.end_stage()
+    # Stage 4: Candidate Windows & Scoring
+    if podcast_mode:
+        timer.start_stage("4. Podcast Q&A Segmentation & Scoring")
+        console.print("[bold cyan]🎙️ Running Podcast Mode: Segmenting Q&A units and stripping host wind-up...[/]")
+        from src.cliplocal.segment.podcast_qa import extract_podcast_qa_pairs
+        from src.cliplocal.score.qa_scorer import score_podcast_qa_pairs, pick_top_qa_clips
+        from src.cliplocal.export.qa_manifest import export_podcast_qa_manifest_json, export_podcast_qa_manifest_md
 
-    # Stage 5: Heuristic Scoring
-    timer.start_stage("5. Heuristic Scoring")
-    scored = score_all_candidates(raw_candidates, audio_path=audio_path)
-    timer.end_stage()
+        qa_pairs = extract_podcast_qa_pairs(sentences)
+        if qa_pairs:
+            scored_qa = score_podcast_qa_pairs(qa_pairs)
+            console.print(f"[green]✔ Discovered {len(scored_qa)} complete Q&A dialogue exchanges[/]")
+            top_qa = pick_top_qa_clips(scored_qa, top_n=num_clips)
+            rendered_ids = [qa.qa_id for qa in top_qa]
 
-    # Stage 6: Deduplication & Ranking
-    timer.start_stage("6. Deduplication & Ranking")
-    top_candidates = deduplicate_candidates(scored, top_n=num_clips)
+            manifest_dir = Path("output") / video_path.stem if output_dir is None else Path(output_dir)
+            manifest_dir.mkdir(parents=True, exist_ok=True)
+            export_podcast_qa_manifest_json(
+                scored_qa,
+                manifest_dir / "podcast_qa_manifest.json",
+                video_title=metadata.title or video_path.stem,
+                source_url=source if is_url(source) else None,
+                rendered_indices=rendered_ids
+            )
+            export_podcast_qa_manifest_md(
+                scored_qa,
+                manifest_dir / "podcast_qa_manifest.md",
+                video_title=metadata.title or video_path.stem,
+                source_url=source if is_url(source) else None,
+                rendered_indices=rendered_ids
+            )
+            console.print(f"[green]✔ Saved Q&A Master Manifest to: {manifest_dir / 'podcast_qa_manifest.md'}[/]")
+            top_candidates = [qa.to_candidate_clip(idx + 1) for idx, qa in enumerate(top_qa)]
+        else:
+            console.print("[yellow]Notice: No distinct Q&A questions detected; falling back to standard windows.[/]")
+            raw_candidates = build_candidate_windows(sentences)
+            scored = score_all_candidates(raw_candidates, audio_path=audio_path)
+            top_candidates = deduplicate_candidates(scored, top_n=num_clips)
+            from src.cliplocal.context.extractor import assign_clip_contexts
+            top_candidates = assign_clip_contexts(top_candidates)
+        timer.end_stage()
+    else:
+        timer.start_stage("4. Candidate Windows")
+        raw_candidates = build_candidate_windows(sentences)
+        timer.end_stage()
 
-    # Automatically extract and assign meaningful topic context headlines to every clip
-    from src.cliplocal.context.extractor import assign_clip_contexts
-    top_candidates = assign_clip_contexts(top_candidates)
+        # Stage 5: Heuristic Scoring
+        timer.start_stage("5. Heuristic Scoring")
+        scored = score_all_candidates(raw_candidates, audio_path=audio_path)
+        timer.end_stage()
+
+        # Stage 6: Deduplication & Ranking
+        timer.start_stage("6. Deduplication & Ranking")
+        top_candidates = deduplicate_candidates(scored, top_n=num_clips)
+
+        # Automatically extract and assign meaningful topic context headlines to every clip
+        from src.cliplocal.context.extractor import assign_clip_contexts
+        top_candidates = assign_clip_contexts(top_candidates)
 
     if use_llm:
         console.print("[cyan]Running local Ollama LLM re-ranking & title generation...[/]")
@@ -150,6 +192,7 @@ def run(
     style: str = typer.Option("hormozi", "--style", "-s", help="Caption style: hormozi | minimal | boxed | neon | cyberpunk | emerald | fire"),
     mode: str = typer.Option("auto", "--mode", "-m", help="Reframe mode: auto | center | blur_fill | face_follow"),
     backend: Optional[str] = typer.Option(None, "--backend", "-b", help="Transcription backend: mlx | faster_whisper | whisper_cpp"),
+    podcast: bool = typer.Option(False, "--podcast/--no-podcast", help="Enable Podcast Q&A Mode: segment complete Question+Answer pairs and export master Q&A index"),
     no_llm: bool = typer.Option(True, "--no-llm", help="Disable Ollama LLM re-ranking (pure heuristics)"),
     anti_copyright: bool = typer.Option(False, "--anti-copyright/--no-anti-copyright", help="Apply transformative audio tempo (1.025x), vocal EQ, and visual grading"),
     multicam: bool = typer.Option(True, "--multicam/--no-multicam", help="Simulate 2-camera setup (wide vs tight close-up cuts on sentence transitions)"),
@@ -173,6 +216,7 @@ def run(
         reframe_mode=reframe_mode,
         backend=backend,
         use_llm=not no_llm,
+        podcast_mode=podcast,
         auto_zoom=auto_zoom,
         multicam=multicam,
         include_emojis=emojis,

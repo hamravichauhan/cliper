@@ -1,4 +1,5 @@
 import os
+import asyncio
 import shutil
 import mimetypes
 from contextlib import asynccontextmanager
@@ -47,6 +48,7 @@ class SubmitJobRequest(BaseModel):
     max_duration: float = 60.0
     backend: str = "mlx"
     language: Optional[str] = None
+    podcast_mode: bool = False
     use_llm: bool = False
     auto_zoom: bool = True
     multicam: bool = True
@@ -323,6 +325,139 @@ async def export_job_schedule(job_id: str, handle: str = "@ClipLocal"):
         filename=csv_file.name,
         media_type="text/csv"
     )
+
+@app.get("/api/jobs/{job_id}/qa-manifest")
+async def get_job_qa_manifest(job_id: str):
+    job = job_manager.get_job_state(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    possible_dirs = []
+    if job.metadata and job.metadata.file_path:
+        possible_dirs.append(Path("output") / Path(job.metadata.file_path).stem)
+    possible_dirs.append(Path("output") / job_id)
+    if not job.source_url_or_path.startswith("http"):
+        possible_dirs.append(Path("output") / Path(job.source_url_or_path).stem)
+
+    for p in possible_dirs:
+        manifest_file = p / "podcast_qa_manifest.json"
+        if manifest_file.exists():
+            import json
+            return json.loads(manifest_file.read_text(encoding="utf-8"))
+
+    for manifest_file in Path("output").glob("*/podcast_qa_manifest.json"):
+        import json
+        try:
+            return json.loads(manifest_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    return {"total_questions_detected": 0, "questions": []}
+
+@app.post("/api/jobs/{job_id}/render-question/{qa_id}")
+async def render_question_on_demand(job_id: str, qa_id: int):
+    job = job_manager.get_job_state(job_id)
+    if not job or not job.metadata:
+        raise HTTPException(status_code=404, detail="Job or video metadata not found")
+
+    video_path = Path(job.metadata.file_path)
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail=f"Source video file not found: {video_path}")
+
+    possible_dirs = [
+        Path("output") / video_path.stem,
+        Path("output") / job_id
+    ]
+    manifest_path = None
+    for d in possible_dirs:
+        mf = d / "podcast_qa_manifest.json"
+        if mf.exists():
+            manifest_path = mf
+            break
+
+    if not manifest_path:
+        raise HTTPException(status_code=404, detail="Podcast Q&A manifest not found for this job")
+
+    import json
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    target_q = None
+    for q in data.get("questions", []):
+        if q.get("qa_id") == qa_id:
+            target_q = q
+            break
+
+    if not target_q:
+        raise HTTPException(status_code=404, detail=f"Question #{qa_id} not found in manifest")
+
+    from src.cliplocal.core.models import CandidateClip, ScoreBreakdown, ReframeMode, CaptionStyleName
+    from src.cliplocal.render.engine import render_candidate_clip
+
+    output_dir = manifest_path.parent
+    clip_index = len(job.candidates) + 1
+    new_candidate = CandidateClip(
+        clip_id=f"podcast_qa_{qa_id:03d}",
+        index=clip_index,
+        start=target_q["timestamps"]["total_start"],
+        end=target_q["timestamps"]["total_end"],
+        duration=target_q["timestamps"]["duration_seconds"],
+        text=target_q["question_text"],
+        score=ScoreBreakdown(
+            total_score=float(target_q.get("viral_score", 85.0)),
+            hook_score=90.0,
+            acoustic_score=75.0,
+            pace_score=80.0,
+            payoff_score=85.0,
+            hook_type=target_q.get("viral_archetype", "Podcast Q&A")
+        ),
+        title=target_q.get("hook_headline", target_q["question_text"][:50]),
+        caption=target_q.get("social_caption", target_q["question_text"]),
+        hashtags=target_q.get("hashtags", ["#podcast", "#shorts"]),
+        reframe_mode=ReframeMode.AUTO,
+        caption_style=CaptionStyleName.HORMOZI,
+        top_banner=False,
+        multicam=True
+    )
+
+    rendered_file = await asyncio.to_thread(
+        render_candidate_clip,
+        video_path=video_path,
+        candidate=new_candidate,
+        output_dir=output_dir,
+        metadata=job.metadata,
+        reframe_mode=ReframeMode.AUTO,
+        auto_zoom=True,
+        multicam=True,
+        top_banner=False,
+        include_emojis=True,
+        include_sfx=True,
+        extract_thumbnails=True
+    )
+
+    target_q["is_rendered"] = True
+    manifest_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    job.candidates.append(new_candidate)
+    persisted = get_job(job_id)
+    options = persisted.get("options") if persisted else {}
+    from src.cliplocal.web.db import save_job
+    save_job(
+        job_id=job.job_id,
+        created_at=job.created_at,
+        status=job.status.value,
+        progress=job.progress,
+        stage=job.stage,
+        source=job.source_url_or_path,
+        options=options,
+        state=job.model_dump()
+    )
+
+    return {
+        "status": "success",
+        "qa_id": qa_id,
+        "clip_index": clip_index,
+        "output_path": str(rendered_file),
+        "candidate": new_candidate.model_dump()
+    }
 
 class HarvestRequest(BaseModel):
     channel_url: str

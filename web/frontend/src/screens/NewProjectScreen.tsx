@@ -49,6 +49,7 @@ export const NewProjectScreen: React.FC = () => {
   const [harvestedVideos, setHarvestedVideos] = useState<any[]>([])
 
   // Step 2: Settings
+  const [podcastMode, setPodcastMode] = useState(false)
   const [clipCount, setClipCount] = useState(5)
   const [duration, setDuration] = useState(35)
   const [selectedStyle, setSelectedStyle] = useState<CaptionStyle>('hormozi')
@@ -149,6 +150,7 @@ export const NewProjectScreen: React.FC = () => {
       min_duration: Math.max(15, duration - 10),
       max_duration: Math.min(60, duration + 10),
       backend: 'mlx',
+      podcast_mode: podcastMode,
       use_llm: true,
       auto_zoom: true,
       multicam: multiCam,
@@ -453,6 +455,26 @@ export const NewProjectScreen: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
+              {/* Podcast Mode Toggle Box */}
+              <div className="p-3.5 bg-[#141417] border border-border rounded-control space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-text-primary flex items-center gap-2 cursor-pointer" onClick={() => setPodcastMode(!podcastMode)}>
+                    <Radio className="w-4 h-4 text-purple-400" />
+                    <span>🎙️ Podcast Q&A Mode</span>
+                  </label>
+                  <Toggle
+                    label=""
+                    checked={podcastMode}
+                    onChange={setPodcastMode}
+                  />
+                </div>
+                <p className="text-[11px] text-text-secondary leading-relaxed">
+                  {podcastMode
+                    ? "Active: Extracts complete Question+Answer pairs, strips host fluff, matches guest answers, and exports a master Q&A question index for 1-click on-demand rendering."
+                    : "Standard Mode: High-energy sentence cuts & topic highlights. Toggle ON for interview & podcast videos."}
+                </p>
+              </div>
+
               <Slider
                 label="Number of Viral Clips to Harvest"
                 min={1}

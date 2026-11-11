@@ -39,13 +39,17 @@ import {
   Zap,
   Flame,
   Activity,
-  Video
+  Video,
+  Radio
 } from 'lucide-react'
 
 export const ClipReviewStudio: React.FC = () => {
   const {
     clips,
     selectedClipId,
+    activeProject,
+    activeJobId,
+    loadJobIntoStudio,
     selectClip,
     setClipStatus,
     updateClipTitle,
@@ -76,10 +80,71 @@ export const ClipReviewStudio: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Local inspector tab
-  const [inspectorTab, setInspectorTab] = useState<'details' | 'polish' | 'captions' | 'audio' | 'pipeline' | 'copy' | 'brand'>('details')
+  const [inspectorTab, setInspectorTab] = useState<'details' | 'polish' | 'captions' | 'audio' | 'pipeline' | 'copy' | 'brand' | 'podcast_qa'>('details')
   const [filterStatus, setFilterStatus] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // Podcast Q&A Manifest State
+  const [qaManifest, setQaManifest] = useState<any>(null)
+  const [isLoadingManifest, setIsLoadingManifest] = useState(false)
+  const [renderingQaId, setRenderingQaId] = useState<number | null>(null)
+
+  const fetchQaManifest = async () => {
+    const jobId = activeJobId || activeProject?.id
+    if (!jobId) return
+    setIsLoadingManifest(true)
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/qa-manifest`)
+      if (res.ok) {
+        const data = await res.json()
+        setQaManifest(data)
+      }
+    } catch (e) {
+      console.error('Failed to load QA manifest:', e)
+    } finally {
+      setIsLoadingManifest(false)
+    }
+  }
+
+  useEffect(() => {
+    if (inspectorTab === 'podcast_qa') {
+      fetchQaManifest()
+    }
+  }, [inspectorTab, activeJobId, activeProject?.id])
+
+  const handleRenderQuestionOnDemand = async (qaId: number) => {
+    const jobId = activeJobId || activeProject?.id
+    if (!jobId) return
+    setRenderingQaId(qaId)
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/render-question/${qaId}`, { method: 'POST' })
+      if (res.ok) {
+        addToast({
+          title: `Question #${qaId} Rendered!`,
+          description: 'The clip is now available in your studio clip list.',
+          type: 'success'
+        })
+        await fetchQaManifest()
+        await loadJobIntoStudio(jobId, false)
+      } else {
+        const err = await res.json()
+        addToast({
+          title: 'Render Failed',
+          description: err.detail || 'Could not render question clip',
+          type: 'danger'
+        })
+      }
+    } catch (e) {
+      addToast({
+        title: 'Render Error',
+        description: 'Failed to trigger question render',
+        type: 'danger'
+      })
+    } finally {
+      setRenderingQaId(null)
+    }
+  }
 
   // Post-Clip Viral Polish Micro-Edits State
   const [retentionBar, setRetentionBar] = useState(true)
@@ -702,6 +767,7 @@ export const ClipReviewStudio: React.FC = () => {
             <Tabs
               tabs={[
                 { id: 'details', label: 'Details' },
+                { id: 'podcast_qa', label: '🎙️ Q&A Index' },
                 { id: 'polish', label: 'Hook & Polish' },
                 { id: 'captions', label: 'Captions' },
                 { id: 'audio', label: 'Audio' },
@@ -777,6 +843,130 @@ export const ClipReviewStudio: React.FC = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* TAB: PODCAST Q&A INDEX */}
+            {inspectorTab === 'podcast_qa' && (
+              <div className="space-y-4">
+                <div className="bg-[#18181B] border border-border rounded-card p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                        <Radio className="w-4 h-4 text-purple-400" />
+                        <span>Master Podcast Q&A Bank</span>
+                      </h4>
+                      <p className="text-[11px] text-text-secondary mt-0.5">
+                        Every question asked in this episode, who answered it, timestamps, and viral score.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<RotateCcw className={`w-3 h-3 ${isLoadingManifest ? 'animate-spin' : ''}`} />}
+                      onClick={fetchQaManifest}
+                      disabled={isLoadingManifest}
+                    >
+                      Refresh
+                    </Button>
+                  </div>
+
+                  {qaManifest && (
+                    <div className="flex items-center gap-3 pt-2 text-[11px] text-text-muted border-t border-border/50">
+                      <span>Questions Detected: <strong className="text-text-primary">{qaManifest.total_questions_detected || 0}</strong></span>
+                      <span>•</span>
+                      <span>Clips Rendered: <strong className="text-accent">{qaManifest.total_rendered_clips || 0}</strong></span>
+                    </div>
+                  )}
+                </div>
+
+                {isLoadingManifest && (
+                  <div className="py-8 text-center text-xs text-text-muted animate-pulse">
+                    Loading Q&A index from project manifest...
+                  </div>
+                )}
+
+                {!isLoadingManifest && (!qaManifest?.questions || qaManifest.questions.length === 0) && (
+                  <div className="py-8 text-center bg-[#141417] border border-border rounded-card p-6 space-y-2">
+                    <Radio className="w-8 h-8 text-text-muted mx-auto opacity-50" />
+                    <p className="text-xs font-semibold text-text-primary">No Q&A Manifest Found</p>
+                    <p className="text-[11px] text-text-secondary max-w-sm mx-auto">
+                      This project was processed in standard mode, or no interrogative questions were detected. Enable "Podcast Q&A Mode" on new podcast projects to generate the master question index.
+                    </p>
+                  </div>
+                )}
+
+                {!isLoadingManifest && qaManifest?.questions && qaManifest.questions.length > 0 && (
+                  <div className="space-y-3">
+                    {qaManifest.questions.map((q: any) => {
+                      const isRendering = renderingQaId === q.qa_id
+                      const isRendered = q.is_rendered
+
+                      return (
+                        <div
+                          key={q.qa_id}
+                          className={`p-3.5 rounded-card border transition-all ${
+                            isRendered
+                              ? 'bg-[#18181B] border-accent/40 shadow-sm'
+                              : 'bg-[#141417] border-border hover:border-border/80'
+                          } space-y-2.5`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-surface-elevated text-text-secondary text-[10px] font-mono flex items-center justify-center font-bold">
+                                  #{q.qa_id}
+                                </span>
+                                <Badge variant={q.recommended_platform === 'YouTube Shorts' ? 'danger' : 'accent'}>
+                                  {q.recommended_platform}
+                                </Badge>
+                                <span className="text-[10px] font-semibold text-text-muted italic">
+                                  {q.viral_archetype}
+                                </span>
+                              </div>
+                              <h5 className="text-xs font-semibold text-text-primary leading-snug">
+                                "{q.question_text}"
+                              </h5>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-xs font-mono font-bold text-accent">
+                                {Math.round(q.viral_score)}/100
+                              </span>
+                              <p className="text-[10px] text-text-muted">{q.timestamps?.duration_seconds}s</p>
+                            </div>
+                          </div>
+
+                          <p className="text-[11px] text-text-secondary line-clamp-2 leading-relaxed bg-[#0E0E11] p-2 rounded border border-border/40">
+                            <span className="text-accent font-semibold">{q.answerer}:</span> {q.answer_preview}
+                          </p>
+
+                          <div className="flex items-center justify-between pt-1">
+                            <span className="text-[10px] font-mono text-text-muted">
+                              Start: {Math.floor(q.timestamps?.total_start / 60)}:{String(Math.floor(q.timestamps?.total_start % 60)).padStart(2, '0')}
+                            </span>
+
+                            {isRendered ? (
+                              <Badge variant="success">
+                                <CheckCircle2 className="w-3 h-3 inline mr-1" />
+                                Rendered & Ready
+                              </Badge>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                disabled={isRendering}
+                                icon={isRendering ? <RotateCcw className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                                onClick={() => handleRenderQuestionOnDemand(q.qa_id)}
+                              >
+                                {isRendering ? 'Rendering (10s)...' : 'Render This Question'}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

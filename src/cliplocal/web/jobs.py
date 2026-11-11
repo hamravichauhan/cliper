@@ -181,26 +181,80 @@ class JobManager:
         # 4. Candidates & Scoring
         t0 = time.perf_counter()
         job.status = JobStatus.SCORING
-        job.stage = "4. Building & scoring viral candidate windows"
         min_dur = float(options.get("min_duration", 20.0))
         max_dur = float(options.get("max_duration", 60.0))
-        
-        raw_candidates = await asyncio.to_thread(
-            build_candidate_windows,
-            sentences=sentences,
-            min_duration=min_dur,
-            max_duration=max_dur
-        )
-        log(f"Generated {len(raw_candidates)} candidate windows ({min_dur}s - {max_dur}s)")
-
-        scored = await asyncio.to_thread(score_all_candidates, raw_candidates, audio_path=audio_path)
         clip_count = int(options.get("clips", 6))
-        top_candidates = await asyncio.to_thread(deduplicate_candidates, scored, top_n=clip_count)
-        log(f"Deduplicated and selected top {len(top_candidates)} viral candidates")
 
-        # Automatically extract and assign meaningful topic context headlines to every clip
-        from src.cliplocal.context.extractor import assign_clip_contexts
-        top_candidates = assign_clip_contexts(top_candidates)
+        if options.get("podcast_mode"):
+            job.stage = "4. Extracting & scoring Podcast Q&A pairs"
+            log("🎙️ Podcast Mode active: detecting interview questions and answer boundaries...")
+            from src.cliplocal.segment.podcast_qa import extract_podcast_qa_pairs
+            from src.cliplocal.score.qa_scorer import score_podcast_qa_pairs, pick_top_qa_clips
+            from src.cliplocal.export.qa_manifest import export_podcast_qa_manifest_json, export_podcast_qa_manifest_md
+
+            qa_pairs = await asyncio.to_thread(
+                extract_podcast_qa_pairs,
+                sentences=sentences,
+                min_duration=min_dur,
+                max_duration=max_dur
+            )
+            if qa_pairs:
+                scored_qa = await asyncio.to_thread(score_podcast_qa_pairs, qa_pairs)
+                log(f"Detected {len(scored_qa)} complete Q&A dialogue units")
+                top_qa = pick_top_qa_clips(scored_qa, top_n=clip_count)
+                rendered_ids = [qa.qa_id for qa in top_qa]
+
+                manifest_dir = Path("output") / video_path.stem
+                manifest_dir.mkdir(parents=True, exist_ok=True)
+                json_manifest_path = manifest_dir / "podcast_qa_manifest.json"
+                md_manifest_path = manifest_dir / "podcast_qa_manifest.md"
+                await asyncio.to_thread(
+                    export_podcast_qa_manifest_json,
+                    scored_qa,
+                    json_manifest_path,
+                    video_title=metadata.title or video_path.stem,
+                    source_url=source if is_url(source) else None,
+                    rendered_indices=rendered_ids
+                )
+                await asyncio.to_thread(
+                    export_podcast_qa_manifest_md,
+                    scored_qa,
+                    md_manifest_path,
+                    video_title=metadata.title or video_path.stem,
+                    source_url=source if is_url(source) else None,
+                    rendered_indices=rendered_ids
+                )
+                log(f"Exported Master Q&A Bank: {json_manifest_path.name} & {md_manifest_path.name}")
+                top_candidates = [qa.to_candidate_clip(idx + 1) for idx, qa in enumerate(top_qa)]
+            else:
+                log("Notice: No distinct Q&A questions detected; falling back to standard windows.")
+                raw_candidates = await asyncio.to_thread(
+                    build_candidate_windows,
+                    sentences=sentences,
+                    min_duration=min_dur,
+                    max_duration=max_dur
+                )
+                scored = await asyncio.to_thread(score_all_candidates, raw_candidates, audio_path=audio_path)
+                top_candidates = await asyncio.to_thread(deduplicate_candidates, scored, top_n=clip_count)
+                from src.cliplocal.context.extractor import assign_clip_contexts
+                top_candidates = assign_clip_contexts(top_candidates)
+        else:
+            job.stage = "4. Building & scoring viral candidate windows"
+            raw_candidates = await asyncio.to_thread(
+                build_candidate_windows,
+                sentences=sentences,
+                min_duration=min_dur,
+                max_duration=max_dur
+            )
+            log(f"Generated {len(raw_candidates)} candidate windows ({min_dur}s - {max_dur}s)")
+
+            scored = await asyncio.to_thread(score_all_candidates, raw_candidates, audio_path=audio_path)
+            top_candidates = await asyncio.to_thread(deduplicate_candidates, scored, top_n=clip_count)
+            log(f"Deduplicated and selected top {len(top_candidates)} viral candidates")
+
+            # Automatically extract and assign meaningful topic context headlines to every clip
+            from src.cliplocal.context.extractor import assign_clip_contexts
+            top_candidates = assign_clip_contexts(top_candidates)
 
         # 4.5 Optional Local LLM Re-Ranking
         if options.get("use_llm"):
