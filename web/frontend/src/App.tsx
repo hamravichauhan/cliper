@@ -17,6 +17,7 @@ import { LibraryScreen } from './screens/LibraryScreen'
 import { BrandKitsScreen } from './screens/BrandKitsScreen'
 import { ScheduleScreen } from './screens/ScheduleScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
+import { VoiceStudioScreen } from './screens/VoiceStudioScreen'
 
 export const App: React.FC = () => {
   const { currentScreen, fetchHealth, fetchProjects, fetchAnalytics } = useStore()
@@ -43,6 +44,8 @@ export const App: React.FC = () => {
         return <HomeScreen />
       case 'new-project':
         return <NewProjectScreen />
+      case 'voice-studio':
+        return <VoiceStudioScreen />
       case 'processing':
         return <ProcessingScreen />
       case 'projects':

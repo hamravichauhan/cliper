@@ -606,6 +606,126 @@ async def get_discover_presets():
 async def search_discover_videos(query: str, limit: int = 6):
     return search_viral_long_videos(query=query, limit=limit)
 
+# --- AI Voice Studio Endpoints (Indian Flow Voice Cloning) ---
+VOICE_OUTPUT_DIR = Path("/Volumes/Ravi's SSD/PROJECTS/kalp/data/voice_outputs").resolve()
+VOICE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+VOICE_MODEL_DIR = Path("/Users/ravichauhan/Desktop/WORK /video/models/ravi_voice_master")
+VOICE_PYTHON = Path("/Users/ravichauhan/lemo-opuscar/.venv/bin/python3")
+
+class VoiceSynthesisRequest(BaseModel):
+    text: str
+    style: str = "indian_storyteller"
+    speed: float = 1.0
+    bg_music: bool = False
+    music_track: Optional[str] = "cinematic"
+    music_volume: float = 0.15
+
+@app.get("/api/voice/profiles")
+async def get_voice_profiles():
+    profile_json = VOICE_MODEL_DIR / "profile.json"
+    if profile_json.exists():
+        try:
+            import json
+            data = json.loads(profile_json.read_text(encoding="utf-8"))
+            return {
+                "status": "ready",
+                "profile": data,
+                "engine": "F5-TTS Flow-Matching DiT (Apple Silicon Metal MPS)",
+                "music_tracks": ["cinematic", "ambient_lofi", "emotional_piano", "tension_drone", "phonk_drift", "synthwave"]
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    return {"status": "not_configured"}
+
+@app.post("/api/voice/synthesize")
+async def synthesize_voice(req: VoiceSynthesisRequest):
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+    
+    import uuid
+    output_id = uuid.uuid4().hex[:10]
+    raw_wav = VOICE_OUTPUT_DIR / f"voice_{output_id}_raw.wav"
+    final_wav = VOICE_OUTPUT_DIR / f"voice_{output_id}.wav"
+    
+    synthesize_script = VOICE_MODEL_DIR / "synthesize.py"
+    if not synthesize_script.exists():
+        raise HTTPException(status_code=500, detail="Voice model script not found")
+        
+    cmd = [
+        str(VOICE_PYTHON),
+        str(synthesize_script),
+        req.text,
+        "-o", str(raw_wav),
+        "--style", req.style,
+        "--speed", str(req.speed)
+    ]
+    
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        err_msg = stderr.decode(errors="ignore")
+        raise HTTPException(status_code=500, detail=f"Voice synthesis failed: {err_msg}")
+        
+    if not raw_wav.exists():
+        raise HTTPException(status_code=500, detail="Voice synthesis failed to produce audio file")
+        
+    # Optional Background Music Mixing & Loudness Normalization (-16 LUFS)
+    music_file = Path("src/cliplocal/assets/music") / f"{req.music_track}.wav"
+    if req.bg_music and music_file.exists():
+        mix_cmd = [
+            "ffmpeg", "-y",
+            "-i", str(raw_wav),
+            "-stream_loop", "-1", "-i", str(music_file),
+            "-filter_complex",
+            f"[1:a]volume={req.music_volume},equalizer=f=2400:t=q:w=1.2:g=-5[bg];"
+            f"[0:a][bg]amix=inputs=2:duration=first:dropout_transition=2,"
+            f"loudnorm=I=-16:LRA=7:TP=-1.5[out]",
+            "-map", "[out]",
+            "-ar", "24000",
+            "-ac", "1",
+            str(final_wav)
+        ]
+        mix_proc = await asyncio.create_subprocess_exec(*mix_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        await mix_proc.communicate()
+    else:
+        norm_cmd = [
+            "ffmpeg", "-y",
+            "-i", str(raw_wav),
+            "-af", "loudnorm=I=-16:LRA=7:TP=-1.5",
+            "-ar", "24000",
+            "-ac", "1",
+            str(final_wav)
+        ]
+        norm_proc = await asyncio.create_subprocess_exec(*norm_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        await norm_proc.communicate()
+        
+    if raw_wav.exists():
+        raw_wav.unlink()
+        
+    duration = 0.0
+    try:
+        import soundfile as sf
+        info = sf.info(str(final_wav))
+        duration = info.duration
+    except Exception:
+        pass
+        
+    return {
+        "status": "success",
+        "filename": final_wav.name,
+        "audio_url": f"/api/voice/audio/{final_wav.name}",
+        "duration": round(duration, 2),
+        "style": req.style,
+        "text": req.text
+    }
+
+# Mount audio files directory for high-performance streaming with Range requests
+app.mount("/api/voice/audio", StaticFiles(directory=str(VOICE_OUTPUT_DIR)), name="voice_audio")
+
 # Mount frontend build directory if it exists
 frontend_dist = Path("web/frontend/dist")
 if frontend_dist.exists():

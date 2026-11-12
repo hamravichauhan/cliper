@@ -10,6 +10,7 @@ import {
   Calendar,
   Settings,
   Scissors,
+  Mic,
   ChevronLeft,
   ChevronRight,
   Sparkles,
@@ -31,6 +32,7 @@ export const Sidebar: React.FC = () => {
   const navItems: { id: ScreenType; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'home', label: 'Home', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'new-project', label: 'New Project', icon: <PlusCircle className="w-4 h-4 text-accent" /> },
+    { id: 'voice-studio', label: 'AI Voice Studio', icon: <Mic className="w-4 h-4 text-accent" />, badge: 'Indian Flow' },
     { id: 'studio', label: 'Clip Review Studio', icon: <Scissors className="w-4 h-4 text-accent" />, badge: clips.length > 0 ? String(clips.length) : undefined },
     { id: 'projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" /> },
     { id: 'library', label: 'Library', icon: <Library className="w-4 h-4" /> },

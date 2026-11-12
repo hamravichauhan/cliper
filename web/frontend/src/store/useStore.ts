@@ -5,6 +5,7 @@ import { mockClips, mockProjects, mockBrandKits, mockEngineHealth } from '../moc
 export type ScreenType =
   | 'home'
   | 'new-project'
+  | 'voice-studio'
   | 'processing'
   | 'studio'
   | 'projects'
